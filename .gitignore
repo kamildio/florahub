@@ -1,0 +1,19 @@
+# Local tooling / editor
+.claude/
+.DS_Store
+
+# Node
+node_modules/
+**/node_modules/
+dist/
+
+# Backend local config & artifacts
+backend/config/config.php
+backend/storage/*.log
+backend/database/*.sqlite
+vendor/
+
+# Env
+.env
+.env.*
+!.env.example

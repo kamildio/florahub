@@ -1,0 +1,152 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Brand: forest green + floral pink. RGB channels for opacity support. */
+    --background: 250 252 250;
+    --foreground: 19 45 32;
+
+    --card: 255 255 255;
+    --card-foreground: 19 45 32;
+
+    --popover: 255 255 255;
+    --popover-foreground: 19 45 32;
+
+    --primary: 21 128 61;
+    --primary-foreground: 255 255 255;
+
+    --secondary: 232 245 237;
+    --secondary-foreground: 22 101 52;
+
+    --accent: 236 72 153;
+    --accent-foreground: 255 255 255;
+
+    --muted: 240 244 242;
+    --muted-foreground: 90 105 97;
+
+    --destructive: 220 38 38;
+    --destructive-foreground: 255 255 255;
+
+    --success: 22 163 74;
+    --success-foreground: 255 255 255;
+
+    --warning: 202 105 8;
+    --warning-foreground: 255 255 255;
+
+    --border: 224 232 228;
+    --input: 224 232 228;
+    --ring: 21 128 61;
+
+    --radius: 1rem;
+  }
+
+  .dark {
+    --background: 12 20 16;
+    --foreground: 235 242 238;
+
+    --card: 19 29 24;
+    --card-foreground: 235 242 238;
+
+    --popover: 19 29 24;
+    --popover-foreground: 235 242 238;
+
+    --primary: 34 197 94;
+    --primary-foreground: 6 22 13;
+
+    --secondary: 30 44 36;
+    --secondary-foreground: 200 230 212;
+
+    --accent: 244 114 182;
+    --accent-foreground: 28 10 18;
+
+    --muted: 28 38 32;
+    --muted-foreground: 150 168 158;
+
+    --destructive: 248 113 113;
+    --destructive-foreground: 28 6 6;
+
+    --success: 74 222 128;
+    --success-foreground: 6 24 12;
+
+    --warning: 251 191 36;
+    --warning-foreground: 30 18 2;
+
+    --border: 38 51 43;
+    --input: 38 51 43;
+    --ring: 52 211 130;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    min-height: 100dvh;
+  }
+
+  ::selection {
+    @apply bg-accent/20 text-accent;
+  }
+
+  /* Tabular figures for prices and data columns. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-border;
+    border: 2px solid transparent;
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/40;
+  }
+}
+
+@layer components {
+  /* Translucent surface used on navbar and floating panels. */
+  .glass {
+    @apply bg-background/70 backdrop-blur-xl backdrop-saturate-150;
+  }
+
+  /* Decorative floral mesh background for hero sections. */
+  .floral-mesh {
+    background-image:
+      radial-gradient(at 12% 18%, rgb(var(--primary) / 0.12) 0px, transparent 45%),
+      radial-gradient(at 88% 12%, rgb(var(--accent) / 0.12) 0px, transparent 42%),
+      radial-gradient(at 70% 85%, rgb(var(--secondary-foreground) / 0.08) 0px, transparent 45%);
+  }
+
+  .focus-ring {
+    @apply outline-none ring-offset-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-ring;
+  }
+}
+
+/* Honor reduced-motion: collapse animations and smooth scrolling. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
