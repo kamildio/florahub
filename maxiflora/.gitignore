@@ -74,3 +74,5 @@ server-private/
 *.db
 *.zip
 *.tar*
+
+.payments-test-status.json
