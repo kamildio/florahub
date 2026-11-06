@@ -1,0 +1,16 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {DatabaseSync} from 'node:sqlite';
+import {seed,apply,demoProfiles} from '../lib/maxiflora/engine.mjs';
+import {mutateState,runTimers} from '../lib/maxiflora/store.mjs';
+const now=Date.parse('2026-10-20T05:00:00Z');
+function database(){const sql=new DatabaseSync(':memory:');sql.exec('CREATE TABLE workspaces (id TEXT PRIMARY KEY,revision INTEGER NOT NULL DEFAULT 0,state TEXT NOT NULL)');return {sql,prepare(query){let args=[];return {bind(...values){args=values;return this},async first(){return sql.prepare(query).get(...args)||null},async all(){return {results:sql.prepare(query).all(...args)}},async run(){const r=sql.prepare(query).run(...args);return {meta:{changes:Number(r.changes)}}}}}}}
+function dueState(){const s=seed(now);apply(s,demoProfiles.buyer,{action:'checkout',items:[{pid:1,qty:50,pack:25,price:7000}]},now);return s}
+test('unattended runner persists expiry without state or browser requests and repeats safely',async()=>{const db=database(),s=dueState();db.sql.prepare('INSERT INTO workspaces VALUES (?,?,?)').run('sandbox:timers',0,JSON.stringify(s));const first=await runTimers(db,{now:now+3600000});assert.equal(first.changed,1);const saved=JSON.parse(db.sql.prepare('SELECT state FROM workspaces').get().state);assert.equal(saved.orders[0].status,'unconfirmed');assert.equal(saved.products[0].reserved,0);const repeat=await runTimers(db,{now:now+3600001});assert.equal(repeat.changed,0);assert.equal(db.sql.prepare('SELECT revision FROM workspaces').get().revision,1)});
+test('unattended runner paginates deterministically and never mutates untouched spaces',async()=>{const db=database();for(let i=0;i<3;i++)db.sql.prepare('INSERT INTO workspaces VALUES (?,?,?)').run('sandbox:'+i,0,JSON.stringify(seed(now)));const a=await runTimers(db,{limit:2,now}),b=await runTimers(db,{after:a.next,limit:2,now});assert.equal(a.checked,2);assert.equal(b.checked,1);assert.equal(b.next,null);assert.equal(db.sql.prepare('SELECT SUM(revision) n FROM workspaces').get().n,0)});
+test('concurrent compare-and-swap mutations preserve both committed changes',async()=>{const db=database();await mutateState(db,'sandbox:race',()=>null,now);await Promise.all([mutateState(db,'sandbox:race',s=>{s.products[0].total+=25},now),mutateState(db,'sandbox:race',s=>{s.products[0].total+=50},now)]);const saved=JSON.parse(db.sql.prepare('SELECT state FROM workspaces').get().state);assert.equal(saved.products[0].total,1105)});
+test('unattended stock expiry persists once, notifies only owner and preserves physical balances',async()=>{
+ const db=database(),s=seed(now);s.products=s.products.filter(p=>!p.transit);const balances=s.products.map(p=>[p.id,p.total,p.reserved]);db.sql.prepare('INSERT INTO workspaces VALUES (?,?,?)').run('sandbox:stock-expiry',0,JSON.stringify(s));
+ assert.equal((await runTimers(db,{now:now+7*86400000})).changed,1);const saved=JSON.parse(db.sql.prepare('SELECT state FROM workspaces').get().state);assert.ok(saved.products.every(p=>!p.published));assert.deepEqual(saved.products.map(p=>[p.id,p.total,p.reserved]),balances);assert.equal(saved.notifications.length,8);assert.ok(saved.notifications.every(n=>n.target==='offers'&&n.users.length===1&&n.users[0]==='demo-supplier'));
+ assert.equal((await runTimers(db,{now:now+7*86400000+1})).changed,0);
+});

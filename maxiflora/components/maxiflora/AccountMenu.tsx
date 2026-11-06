@@ -1,0 +1,15 @@
+'use client';
+import {useEffect,useId,useRef,useState} from 'react';
+import {UserRound,LayoutDashboard,LogOut} from 'lucide-react';
+type Props={admin?:boolean;lang:string;name?:string;showLabel?:boolean;busy?:boolean;onNavigate:(page:string)=>void;onLogout:()=>void};
+export default function AccountMenu({admin=false,lang,name,showLabel=false,busy=false,onNavigate,onLogout}:Props){
+ const [open,setOpen]=useState(false),root=useRef<HTMLDivElement>(null),trigger=useRef<HTMLButtonElement>(null),focusOnOpen=useRef(false),id=useId();
+ const t=(ru:string,kk:string)=>lang==='ru'?ru:kk;
+ useEffect(()=>{if(!open)return;if(focusOnOpen.current){root.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();focusOnOpen.current=false}const outside=(e:PointerEvent)=>{if(!root.current?.contains(e.target as Node))setOpen(false)};document.addEventListener('pointerdown',outside);return()=>document.removeEventListener('pointerdown',outside)},[open]);
+ const close=()=>{setOpen(false);trigger.current?.focus()};
+ const navigate=(page:string)=>{setOpen(false);onNavigate(page)};
+ return <div className="account-menu" ref={root} onBlur={e=>{if(!e.currentTarget.contains(e.relatedTarget as Node))setOpen(false)}} onKeyDown={e=>{if(e.key==='Escape'&&open){e.preventDefault();e.stopPropagation();close()}if(open&&['ArrowDown','ArrowUp','Home','End'].includes(e.key)){e.preventDefault();const items=Array.from(root.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]:not(:disabled)')||[]),index=items.indexOf(document.activeElement as HTMLButtonElement);const next=e.key==='Home'?0:e.key==='End'?items.length-1:(index+(e.key==='ArrowDown'?1:-1)+items.length)%items.length;items[next]?.focus()}}}>
+  <button ref={trigger} type="button" className={showLabel?'home-account':'iconbtn avatar mode-profile'} aria-label={t('Меню аккаунта','Аккаунт мәзірі')} title={t('Кабинет, профиль и выход','Кабинет, профиль және шығу')} aria-haspopup="menu" aria-expanded={open} aria-controls={open?id:undefined} onClick={()=>setOpen(!open)} onKeyDown={e=>{if(!open&&['ArrowDown','ArrowUp'].includes(e.key)){e.preventDefault();focusOnOpen.current=true;setOpen(true)}}}><UserRound size={showLabel?20:17}/>{showLabel&&<span>{t('Кабинет','Кабинет')}</span>}</button>
+  {open&&<div className="account-dropdown" id={id} role="menu" aria-label={t('Действия аккаунта','Аккаунт әрекеттері')}>{name&&<p className="account-dropdown-name">{name}</p>}<button type="button" role="menuitem" onClick={()=>navigate('account')}><LayoutDashboard size={17}/>{t('Кабинет','Кабинет')}</button>{admin&&<button type="button" role="menuitem" onClick={()=>navigate('admin')}><LayoutDashboard size={17}/>{t('Администрирование','Әкімшілік')}</button>}<button type="button" role="menuitem" onClick={()=>navigate('profile')}><UserRound size={17}/>{t('Мой профиль','Менің профилім')}</button><button type="button" role="menuitem" className="account-dropdown-logout" disabled={busy} onClick={()=>{setOpen(false);onLogout()}}><LogOut size={17}/>{t(busy?'Выходим…':'Выйти',busy?'Шығуда…':'Шығу')}</button></div>}
+ </div>;
+}

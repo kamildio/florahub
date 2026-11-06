@@ -1,0 +1,7 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {catalogGroups} from '../lib/maxiflora/catalog.mjs';
+const p=(id,baseId,pack,price,available,supplierId='seller-a')=>({id,baseId,pack,price,available,supplierId,supplier:supplierId});
+test('a flower tile compares piece prices across different packs, one base tile retains every supplier offer',()=>{const offers=[p(1,'rose',25,7500,100),p(2,'rose',20,7000,100,'seller-b'),p(3,'plant',1,10000,1)];const rows=catalogGroups(offers);assert.equal(rows.length,2);assert.equal(rows[0].minPrice,300);assert.equal(rows[0].offers.length,2);assert.equal(rows[0].suppliers,2);assert.equal(rows[1].minPrice,10000);});
+test('from price excludes unavailable, held and less-than-pack quantities',()=>{const row=catalogGroups([p(1,'rose',25,1000,0),p(2,'rose',25,2000,24),{...p(3,'rose',25,3000,100),holdSales:true},p(4,'rose',20,6000,100)])[0];assert.equal(row.minPrice,300);assert.equal(row.offers.length,4);assert.equal(catalogGroups([p(1,'empty',25,1000,0)])[0].minPrice,null);});
+test('search chooses base flowers while details still contain all eligible sellers supplied by the caller',()=>{const a=p(1,'rose',25,7500,100),b=p(2,'rose',20,5000,100,'seller-b'),c=p(3,'other',5,10000,20);const rows=catalogGroups([a],[a,b,c]);assert.equal(rows.length,1);assert.deepEqual(rows[0].offers.map(x=>x.id),[2,1]);assert.equal(rows[0].minPrice,250);assert.equal(rows[0].suppliers,2);});

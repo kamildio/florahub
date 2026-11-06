@@ -1,0 +1,11 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {maintenancePass,maintenanceAlert} from '../server/maintenance-node.mjs';
+const secret='synthetic-maintenance-key-'.repeat(3);
+test('scheduler uses fixed HTTPS and a private header, follows bounded pages and does not put credentials in URLs',async()=>{const calls=[];const result=await maintenancePass(secret,async(url,options)=>{calls.push({url,options});return Response.json(calls.length===1?{checked:100,changed:5,next:'sandbox:last'}:{checked:1,changed:1,next:null})});assert.deepEqual(result,{checked:101,changed:6,pages:2});assert.equal(calls[0].url,'https://www.maxiflora.kz/api/platform/maintenance');assert.equal(calls[0].options.headers['x-maxiflora-maintenance'],secret);assert.equal(calls[0].options.redirect,'error');assert.deepEqual(JSON.parse(calls[1].options.body),{after:'sandbox:last'});assert.equal(calls[0].url.includes(secret),false);});
+test('scheduler stops on rejected authentication, non-progressing pages and malformed responses',async()=>{await assert.rejects(maintenancePass('',async()=>{}),/KEY_MISSING/);await assert.rejects(maintenancePass(secret,async()=>new Response('',{status:403})),/HTTP_403/);let i=0;await assert.rejects(maintenancePass(secret,async()=>Response.json({checked:100,changed:0,next:++i?'same':'same'})),/RESPONSE_INVALID/);await assert.rejects(maintenancePass(secret,async()=>Response.json({checked:1,changed:2,next:null})),/RESPONSE_INVALID/);await assert.rejects(maintenancePass(secret,async()=>{},0),/TIME_LIMIT/);});
+
+test('monitoring sends one incident alert per hour, records every failure and signals recovery once',()=>{
+ const first=maintenanceAlert(undefined,{ok:false,error:'MAINTENANCE_HTTP_503',completedAt:1000});assert.equal(first.alert,'MAINTENANCE_HTTP_503');
+ const repeat=maintenanceAlert(first,{ok:false,error:first.error,completedAt:2000});assert.equal(repeat.alert,null);assert.equal(repeat.ok,false);assert.equal(repeat.alertedAt,1000);
+ assert.equal(maintenanceAlert(repeat,{ok:false,error:first.error,completedAt:3601000}).alert,first.error);
+ const recovered=maintenanceAlert(repeat,{ok:true,completedAt:3000});assert.equal(recovered.alert,'MAINTENANCE_RECOVERED');assert.equal(maintenanceAlert(recovered,{ok:true,completedAt:4000}).alert,null);
+});

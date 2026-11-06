@@ -1,0 +1,108 @@
+/* Visual refinement only: preserve layout, information and interaction contracts. */
+@media screen {
+ :root{--ink:#25282e;--muted:#69717c;--line:#e8eaed;--paper:#f8f9fa}
+ body{color:var(--ink);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+ h1,h2,h3{text-wrap:balance}
+ .pagehead h1{font-size:clamp(28px,2.6vw,36px);letter-spacing:-1px;line-height:1.2}
+ .pagehead p{color:#69717c;line-height:1.65}
+ .testbar{background:#f8f9fa;color:#69717c;border-bottom-color:#eceef0}
+ .top,.market-searchbar{border-color:#eceef0}
+ .toptools .iconbtn{border-color:#e8eaed;background:#fff;border-radius:12px}
+ .market-search-form{border-color:#e4e7eb;border-radius:12px;background:#f8f9fb}
+ .market-search-form input{background:transparent;color:#25282e}
+ .market-search-form input::placeholder{color:#747c87}
+ .market-search-form:focus-within{border-color:#e499a1;box-shadow:0 0 0 3px #fa515a0c}
+ .sidebar{border-color:#eceef0}
+ .sidebuttons button{border-radius:10px;color:#59616c;min-height:46px}
+ .sidebuttons button.selected{background:#fff1f2;color:#bf3443}
+ .sidebuttons button.selected svg{color:#bf3443}
+ .workspace-label,.breadcrumb{color:#747c87}
+ .breadcrumb{margin-bottom:24px}
+ .btn{border-radius:10px;line-height:1.4;transition:background .15s ease,border-color .15s ease;box-shadow:none}
+ .btn.secondary{border-color:#e0e4e8;color:#3e4651}
+ .btn.ghost{border-color:#e6e8eb;color:#bf3443}
+ .btn.small{border-radius:8px}
+ .btn:disabled{cursor:not-allowed}
+ .card,.stat,.ordercard,.product{border-color:#e5e8ec;border-radius:14px;box-shadow:none}
+ .card h2,.sectiontitle h2{letter-spacing:-.45px;line-height:1.3}
+ .note{border-radius:10px;line-height:1.7;background:#f8f9fb;border-color:#e9ecf0;color:#606975}
+ .note.warn{background:#fffaf0;border-color:#f0e4c9;color:#805d21}
+ .note.error{background:#fff4f3;border-color:#f2d6d3;color:#a9302d}
+ .tag{border-radius:6px;font-weight:500;line-height:1.45}
+ .field input,.field select,.field textarea{border-radius:10px;border-color:#dfe3e8;background:#fff}
+ .field input::placeholder,.field textarea::placeholder{color:#77808a}
+ .chip{border-radius:9px;border-color:#e3e6ea;color:#606975}
+ .chip.active{background:#fff1f2;border-color:#efc4c9;color:#b93241}
+ .productbody{padding:18px}.product h3{line-height:1.45;color:#25282e}
+ .specs,.product-stock,.unit,.supplierline{color:#69717c}
+ .product-prices{border-color:#eef0f3}.price{font-variant-numeric:tabular-nums}
+ .quantity-stepper{border-radius:9px;border-color:#dfe3e8}
+ .quantity-stepper button{background:#f8f9fa}
+ .home-category-tile,.home-business-card{box-shadow:none;border-color:#e8eaed}
+ .home-carousel{box-shadow:0 3px 16px #20293606}
+ .home-carousel .home-carousel-bar{background:#fffaf7}
+ .admin-workspace{background:#fafbfc;border:1px solid #e7eaee;border-radius:16px;padding:26px}
+ .admin-workspace-heading h2{font-size:26px;letter-spacing:-.65px}
+ .admin-workspace-heading p{color:#69717c}
+ .admin-workspace-nav{gap:8px;padding-bottom:18px;border-bottom:1px solid #e8ebef}
+ .admin-workspace-nav button{border:1px solid transparent;background:transparent;border-radius:9px;min-height:44px;color:#626b76;box-shadow:none}
+ .admin-workspace-nav button[aria-current=page]{background:#fff;border-color:#e5e8ed;color:#b63242;box-shadow:0 1px 3px #18283805}
+ .admin-hub-grid{gap:14px}
+ .admin-hub-grid>button{border-color:#e5e8ed;border-radius:12px;background:#fff;box-shadow:none;padding:20px}
+ .admin-hub-grid>button strong{font-size:15px;line-height:1.45;color:#303741}
+ .admin-hub-grid>button small{font-size:13px;line-height:1.65;color:#69717c}
+ .admin-hub-grid>button em{color:#77808b;font-style:normal}
+ .admin-hub-icon{background:#fff3f4;color:#bd3c4a;border-radius:10px}
+ .admin-section-search{border-color:#e2e6eb;border-radius:10px;background:#fff}
+ .admin-list>article,.home-content-list>article{border-color:#e6e9ed;border-radius:12px;box-shadow:none}
+ .home-content-security{border-color:#e8ebef}
+ .tariff-account{border-color:#e5e8ed;border-radius:16px;overflow:hidden;box-shadow:none}
+ .tariff-preference{background:#fafbfc}.tariff-account-footnote{border-color:#e8ebef;color:#69717c}
+ .modal{border-radius:18px;box-shadow:0 24px 80px #18202d26}
+ .modalback{background:#17202c66}
+ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #c64b64;outline-offset:3px}
+}
+@media (hover:hover) and (pointer:fine){
+ .sidebuttons button:hover:not(.selected),.admin-workspace-nav button:hover:not([aria-current]){background:#f1f3f6;color:#303741}
+ .admin-hub-grid>button:hover{border-color:#d5dbe2;background:#fff;box-shadow:0 4px 14px #23304806}
+ .product:hover{box-shadow:0 4px 16px #23304808}
+}
+@media screen and (max-width:650px){
+ .main{padding-left:16px;padding-right:16px}
+ .pagehead{margin-bottom:22px}.pagehead h1{font-size:28px;letter-spacing:-.7px}
+ .card{padding:20px;border-radius:12px}
+ .admin-workspace{padding:16px;border-radius:14px}
+ .admin-workspace-heading h2{font-size:23px}
+ .admin-workspace-nav{gap:6px;padding-bottom:14px}
+ .admin-workspace-nav button{padding:10px 8px;font-size:12px;min-height:44px}
+ .admin-hub-grid>button{padding:16px}
+ .admin-hub-grid>button small{font-size:12px}
+ .productbody{padding:14px}
+ .field input,.field select,.field textarea{font-size:16px}
+ .modal{border-radius:16px}
+}
+@media (prefers-reduced-motion:reduce){.btn{transition:none}}
+@media screen{
+ .catalog-tile{border-color:#e5e8ec;border-radius:13px}
+ .catalog-tile-specs,.catalog-tile-count,.catalog-page-control{color:#69717c}
+ .catalog-tile-open{color:#b93241;border-color:#edf0f3}
+ .catalog-tile-price{font-variant-numeric:tabular-nums}
+ .catalog-tile-count{font-size:11px;line-height:1.6}
+}
+@media screen and (max-width:650px){
+ .catalog-tile{border-radius:11px}
+ .catalog-tile-title{font-size:14px;line-height:1.4}
+ .catalog-tile-specs{font-size:11px;line-height:1.5}
+ .catalog-tile-count{font-size:10px;line-height:1.6}
+ .catalog-tile-open{font-size:11px;min-height:46px}
+}
+
+/* Compact banner navigation: action and slide selectors only. */
+@media screen{
+ .home-carousel .home-carousel-bar{grid-template-columns:minmax(0,1fr) auto}
+ .home-carousel .home-carousel-dots{justify-self:end;flex-wrap:wrap;max-width:100%}
+}
+@media screen and (max-width:650px){
+ .home-carousel .home-carousel-bar{min-height:0;gap:6px;padding:12px 14px}
+ .home-carousel .home-carousel-dots{grid-column:1/-1;justify-self:center}
+}

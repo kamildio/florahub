@@ -1,0 +1,32 @@
+// Real handler with an isolated synthetic database; no production credentials or external requests.
+import assert from 'node:assert/strict';import {createHash} from 'node:crypto';import {register} from 'node:module';
+register('./fixtures/acceptance-loader.mjs',import.meta.url);
+const {env}=await import('./fixtures/acceptance-runtime.mjs');const {GET,POST}=await import('../app/api/platform/[...path]/route.js');const {seed}=await import('../lib/maxiflora/engine.mjs');const {totp}=await import('../lib/maxiflora/staff-security.mjs');
+const now=Date.now(),origin='https://maxiflora.example.test',token='a'.repeat(64),buyerToken='b'.repeat(64),hash=x=>createHash('sha256').update(x).digest('hex'),s=seed(now);
+s.profiles['demo-buyer'].verificationMethod='email';env.TEST_MODE='false';env.STAFF_OWNER_ACCOUNT_ID='demo-buyer';
+await env.DB.prepare('INSERT INTO workspaces(id,revision,state) VALUES(?,0,?)').bind('live',JSON.stringify(s)).run();
+for(const [value,account] of [[token,'demo-buyer'],[buyerToken,'demo-supplier']])await env.DB.prepare('INSERT INTO sessions(token,account,workspace,expires) VALUES(?,?,?,?)').bind(hash(value),account,'live',now+604800000).run();
+const cookie=value=>'maxiflora_session='+value;
+const get=async(value)=>{const r=await GET(new Request(origin+'/api/platform/state',{headers:value?{cookie:cookie(value)}:{}}));assert.equal(r.status,200);return r.json()};
+const post=(path,body,value=token,requestOrigin=origin)=>POST(new Request(origin+'/api/platform/'+path,{method:'POST',headers:{origin:requestOrigin,'content-type':'application/json',...(value?{cookie:cookie(value)}:{})},body:JSON.stringify(body)}));
+const change=(revision,extra={})=>({action:'city-add',revision,name:'Есик',operationId:crypto.randomUUID(),...extra});
+const setup=await (await post('staff-security',{action:'begin'})).json();assert.ok(setup.setupId);assert.equal((await post('staff-security',{action:'confirm',setupId:setup.setupId,code:await totp(setup.secret)})).status,200);
+
+env.MANUAL_PAYMENTS_ENABLED='true';env.PAYMENTS_BOT_TOKEN='123456789:'+ 'x'.repeat(30);env.PAYMENTS_CHAT_ID='123456789';
+let sent=0;globalThis.fetch=async()=>{sent++;return {ok:true,json:async()=>({ok:true})}};
+const op=body=>({...body,operationId:crypto.randomUUID()});
+assert.equal((await post('payments',op({action:'create',plan:'Start',tariffRevision:1}),null)).status,401);
+const create=op({action:'create',plan:'Start',tariffRevision:1});let r=await post('payments',create,buyerToken);assert.equal(r.status,200);const invoice=(await r.json()).invoice;
+assert.deepEqual((await (await post('payments',create,buyerToken)).json()).invoice,invoice);
+assert.equal((await post('payments',op({action:'paid',id:invoice.id}),token)).status,404);
+assert.equal((await post('payments',op({action:'paid',id:invoice.id}),buyerToken)).status,200);assert.equal(sent,1);
+let state=await get(token);assert.ok(state.billingAdmin);const i=state.billingAdmin.invoices.find(x=>x.id===invoice.id);assert.equal(i.status,'review');
+const confirm=op({action:'confirm',id:i.id,version:i.version,amount:i.price,bankReference:'BANK-TEST-001',reason:'Поступление проверено'});
+assert.equal((await post('billing-admin',confirm,buyerToken)).status,403);
+assert.equal((await post('billing-admin',confirm,token,'https://evil.test')).status,403);
+assert.equal((await post('billing-admin',confirm)).status,200);assert.equal((await post('billing-admin',confirm)).status,200);
+state=await get(buyerToken);assert.equal(state.billingAdmin,null);assert.equal(state.payments.invoices[0].status,'confirmed');assert.equal(JSON.stringify(state.payments).includes('bankReference'),false);assert.equal(state.payments.scheduled.length,1);
+state=await get(token);const account=state.billingAdmin.accounts.find(x=>x.id==='demo-supplier');
+assert.equal((await post('billing-admin',op({action:'revoke',accountId:account.id,version:account.version,reason:'Отзыв для теста'}))).status,200);
+assert.equal((await get(buyerToken)).subscription.activePlan,null);
+console.log('Billing API: auth, origin, MFA, immutable invoice, notice, confirm replay, private projection and revoke passed.');

@@ -1,0 +1,27 @@
+// Real handler with an isolated synthetic database; no production credentials or external requests.
+import assert from 'node:assert/strict';import {createHash} from 'node:crypto';import {register} from 'node:module';
+register('./fixtures/acceptance-loader.mjs',import.meta.url);
+const {env}=await import('./fixtures/acceptance-runtime.mjs');const {GET,POST}=await import('../app/api/platform/[...path]/route.js');const {seed}=await import('../lib/maxiflora/engine.mjs');const {totp}=await import('../lib/maxiflora/staff-security.mjs');
+const now=Date.now(),origin='https://maxiflora.example.test',token='a'.repeat(64),buyerToken='b'.repeat(64),hash=x=>createHash('sha256').update(x).digest('hex'),s=seed(now);
+s.profiles['demo-buyer'].verificationMethod='email';env.TEST_MODE='false';env.STAFF_OWNER_ACCOUNT_ID='demo-buyer';
+await env.DB.prepare('INSERT INTO workspaces(id,revision,state) VALUES(?,0,?)').bind('live',JSON.stringify(s)).run();
+for(const [value,account] of [[token,'demo-buyer'],[buyerToken,'demo-supplier']])await env.DB.prepare('INSERT INTO sessions(token,account,workspace,expires) VALUES(?,?,?,?)').bind(hash(value),account,'live',now+604800000).run();
+const cookie=value=>'maxiflora_session='+value;
+const get=async(value)=>{const r=await GET(new Request(origin+'/api/platform/state',{headers:value?{cookie:cookie(value)}:{}}));assert.equal(r.status,200);return r.json()};
+const post=(path,body,value=token,requestOrigin=origin)=>POST(new Request(origin+'/api/platform/'+path,{method:'POST',headers:{origin:requestOrigin,'content-type':'application/json',...(value?{cookie:cookie(value)}:{})},body:JSON.stringify(body)}));
+const change=(revision,extra={})=>({action:'city-add',revision,name:'Есик',operationId:crypto.randomUUID(),...extra});
+assert.equal((await get()).platformSettingsAdmin,null);assert.equal((await get(token)).platformSettingsAdmin,null);
+assert.equal((await post('platform-settings',change(1),null)).status,401);assert.equal((await post('platform-settings',change(1),buyerToken)).status,403);assert.equal((await post('platform-settings',change(1))).status,401);assert.equal((await post('platform-settings',change(1),token,'https://evil.test')).status,403);
+const setup=await (await post('staff-security',{action:'begin'})).json();assert.ok(setup.setupId);assert.equal((await post('staff-security',{action:'confirm',setupId:setup.setupId,code:await totp(setup.secret)})).status,200);
+let state=await get(token),revision=state.platformSettingsAdmin.revision;
+const request=change(revision),saved=await post('platform-settings',request);assert.equal(saved.status,200);const result=await saved.json();assert.deepEqual(await (await post('platform-settings',request)).json(),result);
+assert.equal((await post('platform-settings',change(revision,{name:'Сарыагаш'}))).status,409);
+let publicState=await get();assert.ok(publicState.cities.includes('Есик'));assert.equal(publicState.platformSettingsAdmin,null);assert.equal(JSON.stringify(publicState.tariffPlans).includes('actorId'),false);
+state=await get(token);const p=state.platformSettingsAdmin.tariffs[0];assert.equal((await post('platform-settings',{...p,action:'tariff-save',price:10990,limit:6,revision:state.platformSettingsAdmin.revision,operationId:crypto.randomUUID()})).status,200);
+publicState=await get();assert.equal(publicState.tariffPlans[0].price,10990);assert.equal(publicState.tariffPlans[0].limit,6);assert.equal(publicState.tariffRevision,2);
+assert.equal((await post('action',{action:'tariff-preference',plan:'Start',preferenceVersion:0,tariffRevision:1,operationId:crypto.randomUUID()})).status,409);
+assert.equal((await post('action',{action:'tariff-preference',plan:'Start',preferenceVersion:0,tariffRevision:2,operationId:crypto.randomUUID()})).status,200);state=await get(token);assert.equal(state.subscription.preference.price,10990);assert.equal(state.subscription.preference.limit,6);
+const current=state.platformSettingsAdmin.revision,race=await Promise.all([post('platform-settings',change(current,{name:'Ленгер'})),post('platform-settings',change(current,{name:'Кентау'}))]);assert.deepEqual(race.map(x=>x.status).sort(),[200,409]);
+state=await get(token);assert.equal(state.platformSettingsAdmin.cities.filter(x=>['Ленгер','Кентау'].includes(x.name)).length,1);assert.ok(state.platformSettingsAdmin.audit.some(x=>x.event==='denied'));
+state=await get(token);const copyBody={action:'content-save',section:'about',revision:state.platformSettingsAdmin.revision,operationId:crypto.randomUUID(),fields:{about:{ru:'Проверка публичного текста',kk:'Ашық мәтінді тексеру'},tagline:{ru:'Новая подпись',kk:'Жаңа қолтаңба'}}};assert.equal((await post('platform-settings',copyBody)).status,200);publicState=await get();assert.equal(publicState.siteCopy.about.ru,'Проверка публичного текста');assert.equal(publicState.platformSettingsAdmin,null);assert.equal((await post('platform-settings',{...copyBody,operationId:crypto.randomUUID()},buyerToken)).status,403);
+console.log('Platform settings API: MFA/origin/owner protection, idempotence, concurrent conflicts, public cities/prices and stale tariff choice passed.');

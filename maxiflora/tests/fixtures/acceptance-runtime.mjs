@@ -1,0 +1,5 @@
+import {DatabaseSync} from 'node:sqlite';
+const sql=new DatabaseSync(':memory:');
+sql.exec(`CREATE TABLE accounts (id TEXT PRIMARY KEY,phone TEXT NOT NULL UNIQUE,password TEXT NOT NULL,profile TEXT NOT NULL);CREATE TABLE workspaces (id TEXT PRIMARY KEY,revision INTEGER NOT NULL DEFAULT 0,state TEXT NOT NULL);CREATE TABLE sessions (token TEXT PRIMARY KEY,account TEXT NOT NULL,workspace TEXT NOT NULL,expires INTEGER NOT NULL);CREATE TABLE login_attempts (key TEXT PRIMARY KEY,count INTEGER NOT NULL DEFAULT 0,reset INTEGER NOT NULL);`);
+const DB={prepare(query){let values=[];return {bind(...args){values=args;return this},async first(){return sql.prepare(query).get(...values)||null},async all(){return {results:sql.prepare(query).all(...values)}},async run(){const row=sql.prepare(query).run(...values);return {meta:{changes:Number(row.changes)}}}}}};
+export const env={DB,TEST_MODE:'true',STAFF_OWNER_ACCOUNT_ID:'demo-supplier',STAFF_MFA_ENCRYPTION_KEY:'ab'.repeat(32),MAINTENANCE_SECRET:'local-maintenance-test-only'};

@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import {randomUUID,randomInt} from 'node:crypto';
+const base=process.env.MAXIFLORA_TEST_URL||'http://127.0.0.1:5173';
+const owner='integration-'+randomUUID();
+const headers={'Content-Type':'application/json',Origin:base,'x-maxiflora-test-workspace':owner};
+let checks=0;
+async function call(path,body,cookie='',expected=200){const r=await fetch(base+'/api/platform/'+path,{headers:{...headers,...(cookie?{Cookie:cookie}:{})},...(body?{method:'POST',body:JSON.stringify(body)}:{})});const d=await r.json();assert.equal(r.status,expected,JSON.stringify(d));return {data:d,cookie:r.headers.get('set-cookie')?.split(';')[0]};}
+const check=label=>{checks++;console.log('✓ '+label)};
+const initial=await call('state');assert.equal(initial.data.authenticated,false);assert.equal(initial.data.products[0].total,undefined);check('Anonymous response conceals stock and identity');
+const buyer=(await call('demo',{role:'buyer'})).cookie,supplier=(await call('demo',{role:'supplier'})).cookie;
+await call('action',{action:'ready',id:1,version:1,operationId:randomUUID()},'',401);check('Writes require a server session');
+const item={pid:1,qty:100,price:7000,pack:25},operationId=randomUUID(),body={action:'checkout',items:[item],operationId};
+const [a,b]=await Promise.all([call('action',body,buyer),call('action',body,buyer)]);assert.deepEqual(a.data,b.data);const id=a.data.results[0].orderId;let state=(await call('state?mode=supplier',null,supplier)).data;assert.equal(state.orders.length,1);assert.equal(state.products.find(p=>p.id===1).reserved,100);check('Concurrent retries create one order and one reserve');
+await call('action',{...body,items:[{...item,qty:200}]},buyer,409);check('Operation key cannot be reused with a changed payload');
+const row=state.orders.find(o=>o.id===id);
+await call('action',{action:'ready',id,version:row.version,operationId:randomUUID()},buyer,403);check('Buyer cannot use supplier transitions');
+const contests=await Promise.all([call('action',{action:'checkout',items:[{...item,qty:500}],operationId:randomUUID()},buyer),call('action',{action:'checkout',items:[{...item,qty:500}],operationId:randomUUID()},buyer)]);assert.equal(contests.filter(x=>x.data.results.some(y=>y.error)).length,1);state=(await call('state?mode=supplier',null,supplier)).data;assert.equal(state.products.find(p=>p.id===1).reserved,600);check('Concurrent distinct checkouts cannot oversell');
+await call('action',{action:'ready',id,version:row.version,operationId:randomUUID()},supplier);state=(await call('state?mode=supplier',null,supplier)).data;assert.equal(state.products.find(p=>p.id===1).total,1030);let updated=state.orders.find(o=>o.id===id);check('Readiness preserves physical inventory');
+const issue={action:'issue',id,version:updated.version,operationId:randomUUID()};const issues=await Promise.all([call('action',issue,supplier),call('action',issue,supplier)]);assert.deepEqual(issues[0].data,issues[1].data);state=(await call('state?mode=supplier',null,supplier)).data;assert.equal(state.products.find(p=>p.id===1).total,930);assert.equal(state.products.find(p=>p.id===1).reserved,500);check('Concurrent issue retries consume inventory once');
+await call('action',{action:'cancel',id,version:updated.version,reason:'stale',operationId:randomUUID()},supplier,409);check('Stale cancellation cannot reverse an issued order');
+const payload={action:'receive',id:1,qty:25,operationId:randomUUID()};await Promise.all([call('action',payload,supplier),call('action',payload,supplier)]);state=(await call('state?mode=supplier',null,supplier)).data;assert.equal(state.products.find(p=>p.id===1).total,955);check('Inventory receipt retry adds stock once');
+const stranger=await fetch(base+'/api/platform/state',{headers:{'x-maxiflora-test-workspace':'other-'+randomUUID()}});const strangerState=await stranger.json();assert.equal(strangerState.orders.length,0);assert.equal(strangerState.products.find(p=>p.id===1).available,1025);check('Separate private visitors have separate sandbox datasets');
+const phone='+7701'+String(randomInt(1000000,9999999));const password='Test-'+randomUUID();const registered=await call('register',{phone,password,agreement:true,privacy:true},'',201);let fresh=(await call('state',null,registered.cookie)).data;assert.equal(fresh.profile.verified,false);await call('action',{action:'checkout',items:[item],operationId:randomUUID()},registered.cookie,403);check('Registration does not imply email verification or checkout eligibility');
+const login=(await call('login',{phone,password})).cookie;const bad=await call('login',{phone,password:'wrong-password'},'',401);await call('logout',{all:true},login);await call('action',{action:'profile',name:'stale session',operationId:randomUUID()},registered.cookie,401);check('Login works and logout-all revokes other sessions');
+const noOrigin=await fetch(base+'/api/platform/demo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({role:'buyer'})});assert.equal(noOrigin.status,403);check('Cross-origin/missing-origin state changes are rejected');
+console.log(`API integration: ${checks} checks passed.`);

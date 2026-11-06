@@ -1,0 +1,23 @@
+// Real handler with an isolated synthetic database; no production credentials or external requests.
+import assert from 'node:assert/strict';import {createHash} from 'node:crypto';import {register} from 'node:module';
+register('./fixtures/acceptance-loader.mjs',import.meta.url);
+const {env}=await import('./fixtures/acceptance-runtime.mjs');const {GET,POST}=await import('../app/api/platform/[...path]/route.js');const {seed}=await import('../lib/maxiflora/engine.mjs');const {totp}=await import('../lib/maxiflora/staff-security.mjs');
+const now=Date.now(),origin='https://maxiflora.example.test',token='a'.repeat(64),buyerToken='b'.repeat(64),hash=x=>createHash('sha256').update(x).digest('hex'),s=seed(now);
+s.profiles['demo-buyer'].verificationMethod='email';env.TEST_MODE='false';env.STAFF_OWNER_ACCOUNT_ID='demo-buyer';
+await env.DB.prepare('INSERT INTO workspaces(id,revision,state) VALUES(?,0,?)').bind('live',JSON.stringify(s)).run();
+for(const [value,account] of [[token,'demo-buyer'],[buyerToken,'demo-supplier']])await env.DB.prepare('INSERT INTO sessions(token,account,workspace,expires) VALUES(?,?,?,?)').bind(hash(value),account,'live',now+604800000).run();
+const cookie=value=>'maxiflora_session='+value;
+const get=async(value)=>{const r=await GET(new Request(origin+'/api/platform/state',{headers:value?{cookie:cookie(value)}:{}}));assert.equal(r.status,200);return r.json()};
+const post=(path,body,value=token,requestOrigin=origin)=>POST(new Request(origin+'/api/platform/'+path,{method:'POST',headers:{origin:requestOrigin,'content-type':'application/json',...(value?{cookie:cookie(value)}:{})},body:JSON.stringify(body)}));
+const edit=(revision,ru,more={})=>({action:'category-save',revision,ru,kk:'',operationId:crypto.randomUUID(),...more});
+assert.equal((await get()).catalogAdmin,null);assert.equal((await get(token)).catalogAdmin,null);assert.equal((await post('catalog-admin',edit(1,'Пионы'),null)).status,401);assert.equal((await post('catalog-admin',edit(1,'Пионы'),buyerToken)).status,403);assert.equal((await post('catalog-admin',edit(1,'Пионы'))).status,401);assert.equal((await post('catalog-admin',edit(1,'Пионы'),token,'https://evil.test')).status,403);
+const setup=await (await post('staff-security',{action:'begin'})).json();assert.ok(setup.setupId);const confirmed=await post('staff-security',{action:'confirm',setupId:setup.setupId,code:await totp(setup.secret)});assert.equal(confirmed.status,200);
+let state=await get(token);assert.ok(state.catalogAdmin);const revision=state.catalogAdmin.revision;
+const request=edit(revision,'Пионы'),saved=await post('catalog-admin',request);assert.equal(saved.status,200);const result=await saved.json();assert.deepEqual(await (await post('catalog-admin',request)).json(),result);
+assert.equal((await post('catalog-admin',edit(revision,'Другие'))).status,409);
+const after=await get();assert.ok(after.catalogCategories.some(x=>x.ru==='Пионы'));assert.equal(after.catalogAdmin,null);assert.equal(JSON.stringify(after.catalogCategories).includes('actorId'),false);
+state=await get(token);const category=state.catalogAdmin.categories.find(x=>x.ru==='Пионы');assert.equal((await post('catalog-admin',{action:'category-status',id:category.id,active:false,revision:state.catalogAdmin.revision,operationId:crypto.randomUUID()})).status,200);assert.equal((await get()).catalogCategories.some(x=>x.id===category.id),false);
+state=await get(token);const current=state.catalogAdmin.revision;
+const race=await Promise.all([post('catalog-admin',edit(current,'Лилии')),post('catalog-admin',edit(current,'Орхидеи'))]);assert.deepEqual(race.map(x=>x.status).sort(),[200,409]);
+state=await get(token);assert.equal(state.catalogAdmin.categories.filter(x=>['Лилии','Орхидеи'].includes(x.ru)).length,1);assert.ok(state.catalogAdmin.audit.some(x=>x.event==='denied'));
+console.log('Catalog admin API: owner/MFA/origin protection, public projection, create/hide, replay and concurrent edit conflicts passed.');

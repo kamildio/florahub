@@ -1,0 +1,5 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {nationalPhoneInput,phoneInputValue,completeMobilePhone} from '../lib/maxiflora/phone-input.mjs';
+import {normalizePhone} from '../lib/maxiflora/auth-codes.mjs';
+test('national entry and pasted Kazakhstan country/domestic numbers use one fixed +7',()=>{for(const input of ['7071234567','+7 707 123 45 67','8 (707) 123-45-67','77071234567']){assert.equal(nationalPhoneInput(input),'7071234567');assert.equal(phoneInputValue(input),'+77071234567');assert.equal(completeMobilePhone(phoneInputValue(input)),true);assert.equal(normalizePhone(phoneInputValue(input)),'+77071234567');}});
+test('clearing a phone leaves the visual prefix independent; incomplete and foreign numbers are not complete',()=>{assert.equal(phoneInputValue(''),'');assert.equal(phoneInputValue('+7'),'');assert.equal(phoneInputValue('8'),'');assert.equal(phoneInputValue('8 7'),'+77');for(const input of ['','+7','+7707','+799999999999','+71234567890'])assert.equal(completeMobilePhone(input),false);});
