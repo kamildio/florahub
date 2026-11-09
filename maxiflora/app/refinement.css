@@ -106,3 +106,92 @@
  .home-carousel .home-carousel-bar{min-height:0;gap:6px;padding:12px 14px}
  .home-carousel .home-carousel-dots{grid-column:1/-1;justify-self:center}
 }
+
+/* November visual QA: consistent form geometry and resilient narrow layouts. */
+@media screen {
+ .main,.main>section,.admin-workspace-content,.grid2>*{min-width:0}
+ .pagehead,.sectiontitle{flex-wrap:wrap;gap:16px}
+ .pagehead>div,.sectiontitle>h1,.sectiontitle>h2{min-width:0}
+ .sectiontitle h1{font-size:clamp(26px,2.6vw,34px);line-height:1.2;margin:0}
+ .btn{white-space:normal;text-align:center;justify-content:center;overflow-wrap:anywhere}
+ .btn svg,.tag svg,.admin-workspace-nav svg,.admin-hub-icon{flex-shrink:0}
+ .btnrow{flex-wrap:wrap;align-items:center}
+ .field{min-width:0;font-size:13px;font-weight:500;color:#525c68;line-height:1.5}
+ .field label{font-size:13px;color:#525c68}
+ .field input,.field select,.field textarea{width:100%;min-width:0;max-width:100%;font:inherit;font-size:15px;font-weight:400;color:var(--ink);padding:12px 14px;min-height:46px;box-sizing:border-box}
+ .field textarea{min-height:112px;resize:vertical;line-height:1.6}
+ .field select{padding-right:28px;text-overflow:ellipsis}
+ .field input[type=checkbox],.field input[type=radio]{width:18px;min-height:18px;padding:0}
+ .payment-terms-check,.check,.registration-combined-consent{min-width:0;gap:10px;line-height:1.6}
+ .payment-terms-check>input,.check>input,.registration-combined-consent>input{width:18px;height:18px;min-width:18px;min-height:18px;flex:0 0 18px;padding:0;margin:3px 0 0;accent-color:#d92f43}
+ .payment-terms-check>span,.registration-combined-consent>span{min-width:0;overflow-wrap:anywhere}
+ .card>p,.operations-workspace p,.payment-invoice p{overflow-wrap:anywhere}
+ .tag{display:inline-flex;align-items:center;gap:5px;max-width:100%;white-space:normal}
+ .admin-workspace-nav{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+ .admin-workspace-nav button{min-width:0;text-align:left;line-height:1.4;padding:11px 10px;font-size:13px}
+ .admin-workspace-heading>.tag{flex-shrink:0}
+ .admin-hub-grid>button{align-items:flex-start;transition:border-color .15s ease,box-shadow .15s ease}
+ .admin-hub-grid>button>svg:last-child{margin-top:3px;flex-shrink:0;color:#929aa5}
+ .home-content-security{padding:14px 0;margin-bottom:18px;border-block:1px solid var(--line)}
+ summary{cursor:pointer;line-height:1.6}
+ .home-content-security>summary{font-size:13px;color:#5d6672}
+ .operations-heading{margin:0 0 24px}.operations-heading h2{margin:0}
+ .operations-workspace>.field{margin:18px 0}.operations-workspace>.card,.customer-support>.card{margin:16px 0}
+ .operations-empty{padding:32px 24px;border:1px dashed #dce1e7;border-radius:12px;text-align:center;background:#fff;margin:20px 0}
+ .operations-empty h3{font-size:17px;margin-bottom:8px}.operations-empty p{color:var(--muted);font-size:14px;max-width:420px;margin:0 auto;line-height:1.65}
+ .operations-workspace .grid2 .card h3{font-size:14px;color:var(--muted);margin-bottom:14px}
+ .operations-workspace .grid2 .card p{font-size:18px;line-height:1.7;font-variant-numeric:tabular-nums}
+ .monitor-buckets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:16px 0 28px}
+ .monitor-buckets>div{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:13px;color:var(--muted)}
+ .monitor-buckets strong{font-size:16px;font-variant-numeric:tabular-nums;color:var(--ink)}
+ .operation-message{margin:8px 0}.operation-message p{margin-top:8px;line-height:1.65}
+ .customer-support .sectiontitle{align-items:center;margin-top:0;margin-bottom:24px}
+ .customer-support .operations-form{margin-top:20px}
+ .empty{background:#fafbfc;border-color:#dfe4ea;padding:48px 24px}.empty p{font-size:14px;line-height:1.7;color:var(--muted)}
+ .empty svg{color:#bd7780}.empty h2{line-height:1.35}
+ .tablewrap{max-width:100%;overscroll-behavior-x:contain}
+ .footer{font-size:12px;line-height:1.6}.footer button{font-size:12px;min-height:32px}.footerlinks{align-items:center}
+ .mobilebar{background:#fffffff5;backdrop-filter:blur(14px)}
+ .modal{background:#fff}.modalhead h2{line-height:1.25;overflow-wrap:anywhere}.modal .close{width:36px;height:36px}
+}
+@media screen and (max-width:1100px){.admin-workspace-nav{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media screen and (max-width:650px){
+ .admin-workspace-nav{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+ .admin-workspace-nav button{padding:10px 7px;font-size:12px;min-height:44px}
+ .admin-workspace-heading{gap:14px;margin-bottom:18px}.admin-workspace-heading h2{font-size:23px;line-height:1.25}
+ .admin-workspace-heading p{font-size:13px;line-height:1.6}.admin-workspace-heading>.tag{font-size:11px}
+ .admin-hub-grid>button{padding:16px 12px;gap:10px}.admin-hub-icon{padding:8px}.admin-hub-icon svg{width:20px;height:20px}
+ .field input,.field select,.field textarea{font-size:16px}
+ .sectiontitle h1{font-size:27px;letter-spacing:-.6px}.sectiontitle h2{font-size:21px}
+ .pagehead>.btn,.customer-support .sectiontitle>.btn{min-height:44px;font-size:13px;padding:10px 16px}
+ .customer-support .sectiontitle{align-items:flex-start;flex-direction:column;gap:14px}
+ .operations-heading{align-items:flex-start}.operations-heading .btn{font-size:12px}
+ .monitor-buckets{grid-template-columns:repeat(2,minmax(0,1fr))}.monitor-buckets>div{padding:10px;font-size:11px;gap:6px}
+ .operations-workspace .grid2 .card p{font-size:17px}
+ .operations-empty{padding:28px 16px}.operations-empty p{font-size:13px}
+ .btnrow>.btn{max-width:100%}
+ .mobilebar button{flex:1;min-width:0;max-width:100%;font-size:10px;line-height:1.25;padding:6px 2px;gap:5px;min-height:50px}
+ .mobilebar svg{width:22px;height:22px}.mobilebar{padding-inline:8px}
+ .toast{bottom:calc(88px + env(safe-area-inset-bottom));line-height:1.5;font-size:13px}
+ .modal .grid2{grid-template-columns:minmax(0,1fr)}
+ .footer{gap:16px;margin-top:36px}.footer .footerlinks{gap:12px}
+}
+@media screen and (max-width:360px){
+ .top .logo{font-size:21px}.toptools{gap:4px}.toptools select{max-width:88px}
+ .admin-workspace{padding:12px}.admin-workspace-nav button{font-size:11px;gap:5px}.admin-workspace-nav svg{width:15px;height:15px}
+ .card{padding:16px}.pagehead h1{font-size:26px}
+}
+@media screen{.admin-mobile-section{display:none}}
+@media screen and (max-width:650px){.admin-mobile-section{display:flex;margin:0 0 18px}.admin-workspace-nav{display:none}.admin-mobile-section select{background:#fff;min-height:48px}.home-content-security{margin-bottom:16px}}
+@media screen{
+ .admin-workspace .home-content-security{border-top:0;padding-top:6px}
+ .staff-security{background:#fff;border-color:#e2e7eb;border-radius:12px}
+ .staff-security h2{line-height:1.3;align-items:flex-start}.staff-security h2 svg{flex:none;margin-top:2px}
+ .staff-security .textbtn{display:inline-flex;align-items:center;justify-content:flex-start;min-height:44px;max-width:100%;border:0;border-radius:6px;background:transparent;color:#a93747;font:inherit;font-size:13px;line-height:1.5;text-align:left;padding:8px 0;text-decoration:underline;text-underline-offset:4px;cursor:pointer}
+ .staff-security .textbtn:disabled{opacity:.5;cursor:not-allowed}
+ .staff-security form input{min-width:0;font-size:16px;border-color:#dfe3e8;border-radius:10px}
+ .staff-security .btnrow{margin-top:16px}
+ .staff-security-check{display:flex;align-items:flex-start;gap:10px;line-height:1.6;margin:18px 0}
+ .staff-security-check input{flex:0 0 18px;width:18px;height:18px;min-height:18px;margin-top:3px}
+}
+@media screen and (max-width:650px){.staff-security{padding:16px}.staff-security .sectiontitle{margin-top:0}.staff-security h2{font-size:18px}.staff-security .textbtn{font-size:12px}.staff-security form .btn{white-space:normal}}
