@@ -1,3 +1,5 @@
+import {operationsView,operationsAction,supplierBannerView} from '../../../../lib/maxiflora/operations.mjs';
+import {hasStaffPermission} from '../../../../lib/maxiflora/staff-permissions.mjs';
 import {paymentView,paymentAction,billingAdminView,billingAdminAction,claimPaymentNotice,finishPaymentNotice,sendPaymentNotice,billingConfigured} from '../../../../lib/maxiflora/manual-payments.mjs';
 import {platformSettingsAction,platformSettingsView,platformSettingsDenial,ensurePlatformSettings,publicPlatformSettings} from '../../../../lib/maxiflora/platform-settings.mjs';
 import {catalogAdminAction,catalogAdminView,catalogAdminDenial} from '../../../../lib/maxiflora/catalog-admin.mjs';
@@ -28,7 +30,7 @@ import {TEST_MODERATOR,testModeratorProfile,requireTestModerator,moderationView,
 import {conversationView,conversationAction} from '../../../../lib/maxiflora/conversations.mjs';
 import {enrollNewAccount,subscriptionView,subscriptionAction,ensureTariffHistory,tariffHistoryPage} from '../../../../lib/maxiflora/subscriptions.mjs';
 import {staffSecurityView,staffSecurityAction} from '../../../../lib/maxiflora/staff-security.mjs';
-import {ensureHomeContent,publicHomeContent,homeContentView,homeContentAction,homeContentDenial} from '../../../../lib/maxiflora/home-content.mjs';
+import {ensureHomeContent,publicHomeContent,requireHomeEditor,homeContentView,homeContentAction,homeContentDenial} from '../../../../lib/maxiflora/home-content.mjs';
 export const dynamic='force-dynamic';
 const COOKIE='maxiflora_session';
 const json=(data,status=200,headers={})=>Response.json(data,{status,headers:{'Cache-Control':'no-store',...headers}});
@@ -184,6 +186,13 @@ async function handle(r){try{
   const {result}=await mutate(ws,async(s,time)=>{try{return await homeContentAction(s,s.profiles[auth.account],b,staffContext,time);}catch(e){if(!(e instanceof DomainError))throw e;homeContentDenial(s,s.profiles[auth.account],b.action,e.status,time);return {error:e.message,status:e.status};}});
   return json(result,result.status||200);
  }
+ if(path==='operations'&&method==='POST'){
+  if(!auth)error('Войдите в аккаунт.',401);
+  const {result}=await mutate(ws,(s,time)=>operationsAction(s,s.profiles[auth.account],b,staffContext,time));return json(result);
+ }
+ if(path==='monitoring'&&method==='GET'){
+  if(!auth)error('Войдите в аккаунт.',401);const s=JSON.parse((await load(ws)).state);await requireHomeEditor(s,s.profiles[auth.account],staffContext,false,Date.now(),'monitoring');return json({monitoring:typeof env.REQUEST_METRICS==='function'?env.REQUEST_METRICS():null});
+ }
  if(path==='payments'&&method==='GET'){if(!auth)error('Войдите в аккаунт.',401);const {s}=await mutate(ws,()=>null);return json(paymentView(s,s.profiles[auth.account],env));}
  if(['payments','billing-admin'].includes(path)&&method==='POST'){
   if(!auth)error('Войдите в аккаунт.',401);
@@ -226,7 +235,7 @@ async function handle(r){try{
   const {s,revision}=await mutate(ws,(s,time)=>{ensureInventory(s,time);ensureBoard(s,time,testing(r));ensureHomeContent(s);ensureDirectory(s);ensurePlatformSettings(s);conversationView(s,null);if(auth)ensureTariffHistory(s.profiles[auth.account])}),u=auth?s.profiles[auth.account]:null;
   const mode=new URL(r.url).searchParams.get('mode');
   const view=snapshot(s,u,mode);if(mode!=='supplier'&&new URL(r.url).searchParams.get('catalog')==='remote')view.products=[];
-  return json({...view,...paymentView(s,u,env),...await billingAdminView(s,u,staffContext,env),...await homeContentView(s,u,staffContext),...await catalogAdminView(s,u,staffContext),...await platformSettingsView(s,u,staffContext),...staffSecurityView(s,u,staffContext),...subscriptionView(u,Date.now(),s),...businessView(s,u),...boardView(s,u),...conversationView(s,u),...moderationView(s,u,{testMode:testing(r),workspace:ws}),offerImports:mode==='supplier'&&u?.supplier?(s.offerImports||[]).filter(x=>x.supplierId===u.id):[],stockVersions:mode==='supplier'&&u?.supplier?Object.fromEntries(await Promise.all(s.products.filter(p=>p.supplierId===u.id).map(async p=>[p.id,await inventoryVersion(p)]))):{},assemblySheets:mode==='supplier'&&u?.supplier?(s.assemblySheets||[]).filter(x=>x.supplierId===u.id).map(x=>assemblyView(s,u,x.id)):[],inventoryImports:mode==='supplier'?ownImports(s,u):[],calendar:mode==='supplier'?supplierCalendar(s,u):[],mailbox:u&&testing(r)?accountMail(s,u.id):[],revision,testMode:testing(r),authenticated:!!u,emailVerification:{configured:!testing(r)&&env.EMAIL_CONFIGURED===true,pending:!!u&&!testing(r)&&s.productionEmailChallenges?.[u.id]?.status==='sent'&&s.productionEmailChallenges[u.id].expiresAt>Date.now()&&s.productionEmailChallenges[u.id].email===u.email?.trim().toLowerCase()},phoneAuth:{...phoneChannels(testing(r)?{}:env),registration:!testing(r)&&phoneChannels(env).configured&&env.REGISTRATION_ENABLED==='true'&&env.LEGAL_APPROVED_VERSION===CONSENT_VERSION&&(!db().accountEmailReady||await db().accountEmailReady())},telegram:{configured:!testing(r)&&telegramConfigured(env),linked:!!u&&Object.values(s.telegramIdentities||{}).some(x=>x.account===u.id)}});
+  return json({...view,...paymentView(s,u,env),...await billingAdminView(s,u,staffContext,env),...await homeContentView(s,u,staffContext),...await catalogAdminView(s,u,staffContext),...await platformSettingsView(s,u,staffContext),...staffSecurityView(s,u,staffContext),...await operationsView(s,u,staffContext),...supplierBannerView(s,u),...subscriptionView(u,Date.now(),s),...businessView(s,u),...boardView(s,u),...conversationView(s,u),...moderationView(s,u,{testMode:testing(r),workspace:ws,productionAuthorized:hasStaffPermission(s,u,staffContext,'moderation')&&staffSecurityView(s,u,staffContext).staffSecurity?.confirmed===true}),offerImports:mode==='supplier'&&u?.supplier?(s.offerImports||[]).filter(x=>x.supplierId===u.id):[],stockVersions:mode==='supplier'&&u?.supplier?Object.fromEntries(await Promise.all(s.products.filter(p=>p.supplierId===u.id).map(async p=>[p.id,await inventoryVersion(p)]))):{},assemblySheets:mode==='supplier'&&u?.supplier?(s.assemblySheets||[]).filter(x=>x.supplierId===u.id).map(x=>assemblyView(s,u,x.id)):[],inventoryImports:mode==='supplier'?ownImports(s,u):[],calendar:mode==='supplier'?supplierCalendar(s,u):[],mailbox:u&&testing(r)?accountMail(s,u.id):[],revision,testMode:testing(r),authenticated:!!u,emailVerification:{configured:!testing(r)&&env.EMAIL_CONFIGURED===true,pending:!!u&&!testing(r)&&s.productionEmailChallenges?.[u.id]?.status==='sent'&&s.productionEmailChallenges[u.id].expiresAt>Date.now()&&s.productionEmailChallenges[u.id].email===u.email?.trim().toLowerCase()},phoneAuth:{...phoneChannels(testing(r)?{}:env),registration:!testing(r)&&phoneChannels(env).configured&&env.REGISTRATION_ENABLED==='true'&&env.LEGAL_APPROVED_VERSION===CONSENT_VERSION&&(!db().accountEmailReady||await db().accountEmailReady())},telegram:{configured:!testing(r)&&telegramConfigured(env),linked:!!u&&Object.values(s.telegramIdentities||{}).some(x=>x.account===u.id)}});
  }
  if(path==='tariff-history'&&method==='GET'){
   if(!auth)error('Войдите для просмотра истории тарифов.',401);
@@ -277,13 +286,13 @@ async function handle(r){try{
   if(typeof b.operationId!=='string'||!/^[-a-zA-Z0-9]{16,80}$/.test(b.operationId))error('Не указан идентификатор операции.',400);
   const fingerprint=await hash(JSON.stringify({...b,operationId:undefined}));
   const {result}=await mutate(ws,async (s,time)=>{ensureInventory(s,time);ensureBoard(s,time,testing(r));const u=s.profiles[auth.account];if(!u)error('Сеанс недействителен.',401);const key=u.id+':'+b.operationId;
-   const staffContext={testMode:testing(r),workspace:ws};
-   if(typeof b.action==='string'&&b.action.startsWith('moderation-'))requireTestModerator(u,staffContext);
+   const moderationContext={...staffContext};
+   if(typeof b.action==='string'&&b.action.startsWith('moderation-')){if(testing(r)&&u.id===TEST_MODERATOR)requireTestModerator(u,moderationContext);else {await requireHomeEditor(s,u,staffContext,true,time,'moderation');moderationContext.productionAuthorized=true;}}
    if(u.id===TEST_MODERATOR&&(typeof b.action!=='string'||!b.action.startsWith('moderation-')))error('Тестовый модератор работает только с очередью контента.',403);
    if(s.receipts[key]){if(s.receipts[key].fingerprint!==fingerprint)error('Идентификатор уже использован для другой операции.',409);return s.receipts[key].result;}
    if(b.action==='profile'&&b.email){const normalized=String(b.email).trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized))error('Проверьте email.');if(Object.values(s.profiles).some(p=>p.id!==u.id&&p.email?.toLowerCase()===normalized))error('Не удалось сохранить этот email.');b.email=normalized;}
    let result;
-   if(typeof b.action==='string'&&b.action.startsWith('moderation-'))result=moderationAction(s,u,b,staffContext,time);
+   if(typeof b.action==='string'&&b.action.startsWith('moderation-'))result=moderationAction(s,u,b,moderationContext,time);
    else if(b.action==='email-send'){
     if(!testing(r))error('Почтовый сервис ещё не подключён.',503);
     const bytes=crypto.getRandomValues(new Uint32Array(1));const code=String(bytes[0]%1000000).padStart(6,'0');
@@ -309,4 +318,5 @@ async function handle(r){try{
  }
  return json({error:'Раздел API не найден.'},404);
  }catch(e){console.error(e instanceof DomainError?e.message:'Platform request failed '+e?.name);if(local(r)&&!(e instanceof DomainError))console.error({busy:/busy|locked/i.test(String(e?.message)),frames:String(e?.stack||'').split('\n').slice(1,4).join('\n')});return json({error:e instanceof DomainError?e.message:'Не удалось сохранить данные. Повторите попытку.'},e instanceof DomainError?e.status:500);}}
-export const GET=handle;export const POST=handle;
+async function monitored(r){const started=performance.now(),id=crypto.randomUUID();const response=await handle(r);const path=new URL(r.url).pathname.split('/').at(-1);const allowed=['state','catalog','action','operations','monitoring','payments','billing-admin','staff-security','maintenance','login','register','auth-code-send','auth-code-check','home-content','catalog-admin','platform-settings'];try{env.RECORD_REQUEST?.({id,path:allowed.includes(path)?path:'other',status:response.status,duration:performance.now()-started,time:Date.now()})}catch{}response.headers.set('X-Request-ID',id);return response;}
+export const GET=monitored;export const POST=monitored;

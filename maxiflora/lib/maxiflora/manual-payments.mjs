@@ -14,7 +14,7 @@ export function paymentView(s,u,env,now=Date.now()){
  const c=s.billing;return {payments:{termsVersion:PAYMENT_TERMS_VERSION,terms:paymentTerms,support:paymentSupport,available:billingConfigured(env),url:billingConfigured(env)?paymentPolicy.url:null,recipient:paymentPolicy.recipient,invoices:u?(c?.invoices||[]).filter(i=>i.accountId===u.id).slice(-30).reverse().map(ownInvoice):[],scheduled:u?(c?.grants||[]).filter(g=>g.accountId===u.id&&g.status==='queued').map(g=>({id:g.id,plan:g.plan,startsAt:g.startsAt,endsAt:g.endsAt})):[]}};
 }
 export async function billingAdminView(s,u,ctx,env,now=Date.now()){
- try{await requireHomeEditor(s,u,ctx,false,now)}catch(e){if(e instanceof DomainError)return {billingAdmin:null};throw e}
+ try{await requireHomeEditor(s,u,ctx,false,now,'billing')}catch(e){if(e instanceof DomainError)return {billingAdmin:null};throw e}
  const c=s.billing||{revision:1,invoices:[],grants:[],audit:[],outbox:[]};
  return {billingAdmin:{revision:c.revision,configured:billingConfigured(env),accounts:Object.values(s.profiles).map(p=>({id:p.id,name:p.name||p.contact||p.email||p.id,phone:p.phone,email:p.email,plan:p.plan,planUntil:p.planUntil,version:p.accessVersion||0})),invoices:c.invoices.slice(-200).reverse().map(i=>({...ownInvoice(i),accountId:i.accountId,version:i.version,bankReference:i.bankReference,delivery:c.outbox.find(x=>x.invoiceId===i.id)?.status||null})),grants:c.grants.slice(-200).reverse(),audit:c.audit.slice(-100).reverse()}};
 }
@@ -61,10 +61,11 @@ export async function paymentAction(s,u,b,env,now=Date.now()){
  const result={invoice:ownInvoice(i)};s.receipts??={};s.receipts[key]={fingerprint:fp,result,time:now};return result;
 }
 export async function billingAdminAction(s,u,b,ctx,now=Date.now()){
- await requireHomeEditor(s,u,ctx,true,now);
+ await requireHomeEditor(s,u,ctx,true,now,'billing');
  if(!['confirm','reject','grant','revoke'].includes(b.action))fail('Действие недоступно.');
  if(typeof b.operationId!=='string'||!/^[-a-zA-Z0-9]{16,80}$/.test(b.operationId))fail('Нужен идентификатор операции.',400);
  const c=ensure(s),fp=await hash(JSON.stringify({...b,operationId:undefined})),key=u.id+':billing-admin:'+b.operationId,prior=s.receipts?.[key];if(prior){if(prior.fingerprint!==fp)fail('Идентификатор использован.',409);return prior.result}
+ const targetId=['confirm','reject'].includes(b.action)?c.invoices.find(i=>i.id===b.id)?.accountId:b.accountId;if(u.id!==ctx.ownerId&&[u.id,ctx.ownerId].includes(targetId))fail('Оплату и доступ сотрудника или владельца подтверждает владелец.',403);
  let result;
  if(['confirm','reject'].includes(b.action)){
   const i=c.invoices.find(i=>i.id===b.id);if(!i)fail('Заявка не найдена.',404);

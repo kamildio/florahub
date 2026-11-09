@@ -6,8 +6,9 @@ export async function loadState(db,id){
 export async function mutateState(db,id,fn,now){
  for(let i=0;i<8;i++){
   const row=await loadState(db,id),s=JSON.parse(row.state),time=now??Date.now();processTimers(s,time);const result=await fn(s,time);
+  const serialized=JSON.stringify(s);if(serialized===row.state)return {s,result,revision:row.revision};
   const before=JSON.parse(row.state),profiles=Object.values(s.profiles||{}).filter(p=>JSON.stringify(p)!==JSON.stringify(before.profiles?.[p.id]));
-  const r=db.commitWorkspaceState?await db.commitWorkspaceState({id,revision:row.revision,state:JSON.stringify(s),profiles}):await db.prepare('UPDATE workspaces SET state=?,revision=revision+1 WHERE id=? AND revision=?').bind(JSON.stringify(s),id,row.revision).run();
+  const r=db.commitWorkspaceState?await db.commitWorkspaceState({id,revision:row.revision,state:serialized,profiles}):await db.prepare('UPDATE workspaces SET state=?,revision=revision+1 WHERE id=? AND revision=?').bind(serialized,id,row.revision).run();
   if(r.meta.changes===1)return {s,result,revision:row.revision+1};
  }
  throw new DomainError('Данные изменяются другим устройством. Повторите действие.',409);

@@ -31,7 +31,7 @@ export function reports(s,u,from,to,now=Date.now()){
  const goods=new Map();for(const o of issued)for(const x of o.items){const key=x.pid+'|'+x.pack;const row=goods.get(key)||{id:x.pid,name:x.name,pack:x.pack,qty:0,value:0};row.qty+=x.qty;row.value+=x.qty/x.pack*x.price;goods.set(key,row);}
  return {from,to,asOf:now,companies,goods:[...goods.values()],orders:created.map(o=>({id:o.id,buyer:o.buyer,created:o.created,status:o.status,value:amount(o),completed:doneAt(o)||null})),created:created.length,issued:issued.length,issuedValue:issued.reduce((n,o)=>n+amount(o),0)};
 }
-export function businessView(s,u){return {baseProducts:availableBaseProducts(s),suppliers:publicSuppliers(s),ownReviews:u?(s.reviews||[]).filter(r=>r.buyerId===u.id):[],cases:u?(s.supportCases||[]).filter(c=>c.participants.includes(u.id)).map(c=>({...c,messages:c.messages.filter(m=>m.visibility==='shared'||m.by===u.id)})):[]};}
+export function businessView(s,u){return {baseProducts:availableBaseProducts(s),suppliers:publicSuppliers(s),ownReviews:u?(s.reviews||[]).filter(r=>r.buyerId===u.id):[],cases:u?(s.supportCases||[]).filter(c=>c.participants.includes(u.id)).map(c=>({...c,messages:c.messages.filter(m=>m.visibility==='shared'||m.visibility==='private'&&(m.by===u.id||m.to===u.id))})):[]};}
 export async function businessAction(s,u,b,now=Date.now()){
  if(b.action==='offer-renew'){const p=supplierProduct(s,u,b.id);if(await inventoryVersion(p)!==b.version)fail('Остаток, цена или публикация изменились. Обновите экран и проверьте данные.',409);return renewStockPublication(s,u,p,b.publicationDays===undefined?7:b.publicationDays,b.confirmFresh,now);}
  if(b.action==='offer-update'){
@@ -79,7 +79,7 @@ export async function businessAction(s,u,b,now=Date.now()){
   if(!record)fail('Обращение недоступно.',403);if(['closed','resolved'].includes(record.status))fail('Обращение завершено. Откройте новое, если вопрос не решён.');
   if(typeof b.text!=='string'||!b.text.trim()||b.text.length>4000)fail('Опишите вопрос: от 1 до 4000 символов.');
   if(!['shared','private'].includes(b.visibility))fail('Выберите видимость сообщения.');
-  record.messages.push({id:crypto.randomUUID(),by:u.id,text:b.text.trim(),visibility:b.visibility,time:now});record.updated=now;
+  record.messages.push({id:crypto.randomUUID(),by:u.id,text:b.text.trim(),visibility:b.visibility,time:now});record.updated=now;record.version=(record.version||1)+1;
   return {id:record.id,number:record.number};
  }
  fail('Неизвестное действие.');

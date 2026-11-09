@@ -94,3 +94,5 @@
 .payment-panel .payment-terms-check>input{display:block;appearance:auto;width:18px;min-width:18px;max-width:18px;height:18px;min-height:18px;flex:0 0 18px;margin:2px 0 0;padding:0;accent-color:#e52f48}
 .payment-panel .payment-terms-check>span{display:block;min-width:0;line-height:1.5}
 .billing-decision{scroll-margin-top:24px;margin:20px 0}.billing-decision-security:empty{display:none}.billing-decision-security .staff-security{margin-bottom:16px}
+
+.operations-form{display:grid;gap:16px}.operations-form .field{margin:0}.operations-workspace>.card{margin:16px 0}.operation-message{padding:14px 0;border-bottom:1px solid var(--line)}.operation-message p{white-space:pre-wrap;overflow-wrap:anywhere}.operation-message small{color:#687180}.advertising-preview{display:block;width:100%;max-height:240px;object-fit:cover;border-radius:12px}.operations-workspace .payment-terms-check{flex-direction:row;align-items:flex-start}.operations-workspace .payment-terms-check input,.operations-form .payment-terms-check input{width:18px;height:18px;min-height:18px;flex:none;margin:3px 0 0;padding:0}

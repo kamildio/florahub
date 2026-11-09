@@ -78,3 +78,6 @@ server-private/
 .payments-test-status.json
 
 .hosting-cleanup-status.json
+
+.request-metrics.json
+.request-metrics.tmp

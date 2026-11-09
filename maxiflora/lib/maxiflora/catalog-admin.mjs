@@ -8,11 +8,11 @@ const fingerprint=async b=>Array.from(new Uint8Array(await crypto.subtle.digest(
 export function catalogAdminDenial(s,u,action,status,now){const c=ensureDirectory(s);c.audit.push({id:crypto.randomUUID(),actorId:u?.id||null,event:'denied',action:['category-save','category-status','category-reorder','product-save','product-status'].includes(action)?action:'unknown',status,time:now});c.audit=c.audit.slice(-500);}
 export async function catalogAdminView(s,u,ctx,now=Date.now()){
  let catalogAdmin=null;
- try{await requireHomeEditor(s,u,ctx,false,now);const c=directory(s);catalogAdmin={revision:c.revision,categories:c.categories.map(x=>({...x,baseCount:(s.baseProducts||[]).filter(p=>p.category===x.key).length,offerCount:(s.products||[]).filter(p=>p.category===x.key).length})),products:(s.baseProducts||[]).map(x=>({...x,archived:x.archived===true,offerCount:(s.products||[]).filter(p=>p.baseId===x.id).length})),audit:c.audit.slice(-50).reverse()};}catch(e){if(!(e instanceof DomainError))throw e;}
+ try{await requireHomeEditor(s,u,ctx,false,now,'catalog');const c=directory(s);catalogAdmin={revision:c.revision,categories:c.categories.map(x=>({...x,baseCount:(s.baseProducts||[]).filter(p=>p.category===x.key).length,offerCount:(s.products||[]).filter(p=>p.category===x.key).length})),products:(s.baseProducts||[]).map(x=>({...x,archived:x.archived===true,offerCount:(s.products||[]).filter(p=>p.baseId===x.id).length})),audit:c.audit.slice(-50).reverse()};}catch(e){if(!(e instanceof DomainError))throw e;}
  return {catalogCategories:publicCategories(s),catalogAdmin};
 }
 export async function catalogAdminAction(s,u,b,ctx,now=Date.now()){
- await requireHomeEditor(s,u,ctx,true,now);
+ await requireHomeEditor(s,u,ctx,true,now,'catalog');
  if(!['category-save','category-status','category-reorder','product-save','product-status'].includes(b.action))fail('Действие справочника недоступно.');
  if(typeof b.operationId!=='string'||!/^[-a-zA-Z0-9]{16,80}$/.test(b.operationId))fail('Не указан идентификатор операции.',400);
  const fp=await fingerprint(b),receiptKey=u.id+':catalog-admin:'+b.operationId,prior=s.receipts?.[receiptKey];if(prior){if(prior.fingerprint!==fp)fail('Идентификатор уже использован для другой операции.',409);return prior.result;}

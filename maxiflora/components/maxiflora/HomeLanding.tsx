@@ -4,15 +4,15 @@ import BannerCarousel,{type BannerSlide} from './BannerCarousel';
 import {copyText} from '../../lib/maxiflora/site-copy.mjs';
 import {homeSlides} from './home-slides';
 
-type Props={siteCopy?:Record<string,any>;banners:Record<string,any>[];onNews:(item:Record<string,any>)=>void;campaign?:Record<string,any>;lang:string;signedIn:boolean;onRole:(supplier:boolean)=>void;onTariffs:()=>void;onCatalog:()=>void;onBoard:()=>void};
-export default function HomeLanding({siteCopy,banners,onNews,campaign,lang,signedIn,onRole,onTariffs,onCatalog,onBoard}:Props){
+type Props={onSupplier?:(id:string)=>void;siteCopy?:Record<string,any>;banners:Record<string,any>[];onNews:(item:Record<string,any>)=>void;campaign?:Record<string,any>;lang:string;signedIn:boolean;onRole:(supplier:boolean)=>void;onTariffs:()=>void;onCatalog:()=>void;onBoard:()=>void};
+export default function HomeLanding({siteCopy,banners,onNews,campaign,lang,signedIn,onRole,onTariffs,onCatalog,onBoard,onSupplier}:Props){
  const t=(ru:string,kk:string)=>lang==='ru'?ru:kk;
  const copy=(id:string)=>copyText(siteCopy,id,lang);
  const slides:BannerSlide[]=[
   {id:'flowers-for-business',desktop:'/images/florist-roses-v2.webp',mobile:'/images/florist-roses-v2.webp',alt:'',title:copy('heroTitle'),description:copy('heroDescription'),cta:copy('heroButton'),onOpen:onCatalog,actionLabel:t('Открыть каталог цветов в выбранном городе','Таңдалған қаладағы гүлдер каталогын ашу')},
   {id:'maxiflora-max',desktop:'/images/florist-crates-v2.webp',mobile:'/images/florist-crates-v2.webp',alt:'',eyebrow:'MaXiFlora MAX',title:copy('maxTitle'),description:copy('maxDescription'),cta:copy('maxButton'),onOpen:onTariffs,actionLabel:t('Посмотреть возможности тарифа MAX','MAX тарифінің мүмкіндіктерін көру')}
  ];
- slides.unshift(...homeSlides(banners,lang,id=>{if(id==='catalog')onCatalog();else if(id==='board')onBoard();else if(id==='supplier')onRole(true);else onTariffs();},onNews));
+ slides.unshift(...homeSlides(banners,lang,id=>{if(id.startsWith('supplier:'))onSupplier?.(id.slice(9));else if(id==='catalog')onCatalog();else if(id==='board')onBoard();else if(id==='supplier')onRole(true);else onTariffs();},onNews));
  if(campaign?.status==='active'&&lang!=='ru')slides.unshift({id:'first-clients-kk',desktop:'/images/florist-roses-v2.webp',mobile:'/images/florist-roses-v2.webp',alt:'',eyebrow:'Алғашқы клиенттерге',title:'Бірінші ай —\nтегін',description:'Тіркелген күннен бастап MAX тарифі бір айға 0 ₸',cta:signedIn?'Акция шарттары':'Тегін бастау',onOpen:signedIn?onTariffs:()=>onRole(false),actionLabel:'Тегін MAX айының шарттарын көру'});
  if(campaign?.status==='active'&&lang==='ru')slides.unshift({id:'first-clients-fox',desktop:'/images/maxiflora-fox-launch-v2.webp',mobile:'/images/maxiflora-fox-bouquet-v2.webp',alt:'Лисёнок MaXiFlora с букетом. Для первых клиентов — первый месяц бесплатно.',mobileCopy:{eyebrow:'Для первых клиентов',title:'Первый месяц\nбесплатно',description:'Месяц MAX за 0 ₸'},artwork:true,cta:signedIn?'Условия акции':'Начать бесплатно',onOpen:signedIn?onTariffs:()=>onRole(false),actionLabel:signedIn?'Посмотреть условия бесплатного месяца MAX':'Зарегистрироваться и получить бесплатный месяц MAX'});
  return <div className="home-landing">

@@ -10,17 +10,17 @@ export const isTestModerator=(u,context)=>u?.id===TEST_MODERATOR&&context?.testM
 export function requireTestModerator(u,context){if(!isTestModerator(u,context))fail('Кабинет модератора доступен только тестовому модератору в его тестовом пространстве.',403);}
 const safeAd=(s,ad,now=Date.now())=>ad?{...reportSnapshot(s,ad),status:ad.status,submitted:ad.submitted,photos:adPhotos(s,ad),activeCount:(s.boardAds||[]).filter(a=>a.ownerId===ad.ownerId&&a.status==='published'&&a.expires>now).length,previous:(()=>{const prev=ad.history?.findLast(h=>h.event==='edited')?.previous;return prev?reportSnapshot(s,prev):null})()}:null;
 export function moderationView(s,u,context,now=Date.now()){
- if(!isTestModerator(u,context))return {moderation:null};
- return {moderation:{testOnly:true,ads:(s.boardAds||[]).filter(a=>['pending','approved'].includes(a.status)).map(a=>safeAd(s,a,now)),reports:(s.boardReports||[]).filter(r=>r.status==='open').map(r=>({id:r.id,reason:r.reason,comment:r.comment,created:r.created,snapshot:r.snapshot,current:safeAd(s,(s.boardAds||[]).find(a=>a.id===r.adId),now)})),audit:(s.moderationAudit||[]).map(a=>({...a})).slice(-100).reverse()}};
+ if(!context?.productionAuthorized&&!isTestModerator(u,context))return {moderation:null};
+ return {moderation:{testOnly:!context?.productionAuthorized,ads:(s.boardAds||[]).filter(a=>['pending','approved'].includes(a.status)).map(a=>safeAd(s,a,now)),reports:(s.boardReports||[]).filter(r=>r.status==='open').map(r=>({id:r.id,reason:r.reason,comment:r.comment,created:r.created,snapshot:r.snapshot,current:safeAd(s,(s.boardAds||[]).find(a=>a.id===r.adId),now)})),audit:(s.moderationAudit||[]).map(a=>({...a})).slice(-100).reverse()}};
 }
 function comment(b,required){if(typeof b.reason!=='string'||b.reason.length>1000||required&&b.reason.trim().length<10)fail(required?'Укажите основание от 10 до 1000 символов.':'Комментарий — до 1000 символов.');return b.reason.trim();}
 function notify(s,userId,text,adId,reportId,time){s.notifications??=[];s.notifications.unshift({id:crypto.randomUUID(),users:[userId],target:'board',adId,reportId,text,time});}
 function record(s,u,ad,before,event,reason,now,reportId){
- s.moderationAudit??=[];const entry={id:crypto.randomUUID(),actorId:u.id,actor:'Модератор · тест',time:now,event,adId:ad.id,adTitle:ad.title,reviewedVersion:before.version,before:{status:before.status,version:before.version},after:{status:ad.status,version:ad.version},reason,...(reportId?{reportId}:{})};
+ s.moderationAudit??=[];const entry={id:crypto.randomUUID(),actorId:u.id,actor:u.name||'Модератор',time:now,event,adId:ad.id,adTitle:ad.title,reviewedVersion:before.version,before:{status:before.status,version:before.version},after:{status:ad.status,version:ad.version},reason,...(reportId?{reportId}:{})};
  s.moderationAudit.push(entry);return entry;
 }
 export function moderationAction(s,u,b,context,now=Date.now()){
- requireTestModerator(u,context);
+ if(!context?.productionAuthorized)requireTestModerator(u,context);
  if(!['moderation-approve','moderation-reject','moderation-publish','moderation-report'].includes(b.action))fail('Это действие недоступно модератору.',403);
  const report=b.action==='moderation-report'?(s.boardReports||[]).find(r=>r.id===b.reportId&&r.status==='open'):null;
  if(b.action==='moderation-report'&&!report)fail('Жалоба уже рассмотрена или недоступна. Обновите очередь.',409);

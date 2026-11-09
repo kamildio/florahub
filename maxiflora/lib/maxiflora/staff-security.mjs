@@ -1,3 +1,4 @@
+import {staffPermissions,hasStaffPermission} from './staff-permissions.mjs';
 import {DomainError} from './engine.mjs';
 const fail=(message,status=403)=>{throw new DomainError(message,status)};
 const encoder=new TextEncoder(),alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
@@ -20,8 +21,8 @@ async function encryptionKey(ctx){if(typeof ctx.encryptionKey!=='string'||!/^[a-
 const aad=id=>encoder.encode('maxiflora:staff-mfa:v1:'+id);
 export async function sealSecret(secret,id,ctx){const iv=random(12),key=await encryptionKey(ctx);return {iv:hex(iv),ciphertext:hex(new Uint8Array(await crypto.subtle.encrypt({name:'AES-GCM',iv,additionalData:aad(id)},key,encoder.encode(secret))))};}
 export async function openSecret(value,id,ctx){try{const key=await encryptionKey(ctx);return new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:unhex(value.iv),additionalData:aad(id)},key,unhex(value.ciphertext)));}catch{fail('Защита кабинета временно недоступна. Требуется проверка оператором.',503);}}
-function eligible(u,ctx){return !!u&&typeof ctx.ownerId==='string'&&ctx.ownerId.length>0&&u.id===ctx.ownerId&&u.verified===true&&typeof u.email==='string'&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u.email)&&(ctx.testMode===true&&ctx.workspace?.startsWith('sandbox:')||ctx.workspace==='live'&&u.verificationMethod==='email');}
-function identity(u,ctx,now){if(!eligible(u,ctx))fail('Кабинет оператора недоступен.');if(typeof ctx.sessionId!=='string'||!/^[a-f0-9]{64}$/.test(ctx.sessionId)||!Number.isFinite(ctx.sessionExpires)||ctx.sessionExpires<=now||!Number.isFinite(ctx.authenticatedAt)||ctx.authenticatedAt>now)fail('Войдите в аккаунт повторно.',401);}
+function eligible(s,u,ctx){return !!u&&typeof ctx.ownerId==='string'&&ctx.ownerId.length>0&&staffPermissions(s,u,ctx).length>0&&u.verified===true&&typeof u.email==='string'&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u.email)&&(ctx.testMode===true&&ctx.workspace?.startsWith('sandbox:')||ctx.workspace==='live'&&u.verificationMethod==='email');}
+function identity(s,u,ctx,now){if(!eligible(s,u,ctx))fail('Кабинет оператора недоступен.');if(typeof ctx.sessionId!=='string'||!/^[a-f0-9]{64}$/.test(ctx.sessionId)||!Number.isFinite(ctx.sessionExpires)||ctx.sessionExpires<=now||!Number.isFinite(ctx.authenticatedAt)||ctx.authenticatedAt>now)fail('Войдите в аккаунт повторно.',401);}
 function recentPassword(ctx,now){if(now-ctx.authenticatedAt>600000)fail('Для настройки защиты войдите заново с паролем.',401);}
 function audit(s,u,event,result,now){s.staffSecurityAudit??=[];s.staffSecurityAudit.push({id:crypto.randomUUID(),actorId:u.id,event,result,time:now});}
 function record(s,u){s.staffSecurity??={};return s.staffSecurity[u.id]??={failures:0,windowUntil:0,lastCounter:-1,sessions:{}};}
@@ -31,19 +32,19 @@ function grant(q,ctx,method,now){q.sessions??={};for(const [id,x] of Object.entr
 async function matchingCounter(secret,code,last,now){if(typeof code!=='string'||!/^\d{6}$/.test(code))return null;const current=Math.floor(now/30000);let match=null;for(const delta of [0,-1,1]){const counter=current+delta;if(counter>=0&&counter>last&&await totp(secret,counter*30000)===code)match=counter;}return match;}
 async function recoverySet(q,id){const codes=Array.from({length:10},()=>hex(random(16)).match(/.{8}/g).join('-'));q.recoveryHashes=await Promise.all(codes.map(c=>sha(id+':'+c.replaceAll('-',''))));return codes;}
 export function staffSecurityView(s,u,ctx,now=Date.now()){
- if(!eligible(u,ctx))return {staffSecurity:null};
+ if(!eligible(s,u,ctx))return {staffSecurity:null};
  const q=s.staffSecurity?.[u.id],session=q?.sessions?.[ctx.sessionId];
  const configured=typeof ctx.encryptionKey==='string'&&/^[a-f0-9]{64}$/i.test(ctx.encryptionKey);
  const confirmed=configured&&!!session&&session.verifiedAt<=now&&session.expiresAt>now&&ctx.sessionExpires>now;
- return {staffSecurity:{eligible:true,configured,enrolled:!!q?.secret,confirmed,fresh:confirmed&&now-session.verifiedAt<=300000,recoveryRemaining:q?.recoveryHashes?.length||0,...(confirmed?{verifiedAt:session.verifiedAt,expiresAt:session.expiresAt}:{}),audit:(s.staffSecurityAudit||[]).filter(x=>x.actorId===u.id).slice(-50).reverse()}};
+ return {staffSecurity:{eligible:true,permissions:staffPermissions(s,u,ctx),configured,enrolled:!!q?.secret,confirmed,fresh:confirmed&&now-session.verifiedAt<=300000,recoveryRemaining:q?.recoveryHashes?.length||0,...(confirmed?{verifiedAt:session.verifiedAt,expiresAt:session.expiresAt}:{}),audit:(s.staffSecurityAudit||[]).filter(x=>x.actorId===u.id).slice(-50).reverse()}};
 }
-export function requireStaffConfirmation(s,u,ctx,{critical=false,now=Date.now()}={}){
- identity(u,ctx,now);if(typeof ctx.encryptionKey!=='string'||!/^[a-f0-9]{64}$/i.test(ctx.encryptionKey))fail('Защита кабинета временно недоступна.',503);const q=s.staffSecurity?.[u.id],v=q?.sessions?.[ctx.sessionId];if(!q?.secret||!v||v.verifiedAt>now||v.expiresAt<=now)fail('Подтвердите вход кодом Microsoft Authenticator.',401);if(critical&&now-v.verifiedAt>300000)fail('Подтвердите критическое действие свежим кодом.',401);return {actorId:u.id,verifiedAt:v.verifiedAt,method:v.method};
+export function requireStaffConfirmation(s,u,ctx,{critical=false,now=Date.now(),permission='owner'}={}){
+ identity(s,u,ctx,now);if(!hasStaffPermission(s,u,ctx,permission))fail('Недостаточно прав для этого раздела.');if(typeof ctx.encryptionKey!=='string'||!/^[a-f0-9]{64}$/i.test(ctx.encryptionKey))fail('Защита кабинета временно недоступна.',503);const q=s.staffSecurity?.[u.id],v=q?.sessions?.[ctx.sessionId];if(!q?.secret||!v||v.verifiedAt>now||v.expiresAt<=now)fail('Подтвердите вход кодом Microsoft Authenticator.',401);if(critical&&now-v.verifiedAt>300000)fail('Подтвердите критическое действие свежим кодом.',401);return {actorId:u.id,verifiedAt:v.verifiedAt,method:v.method};
 }
 // The caller supplies server-only context and commits even ok:false outcomes with CAS.
 // Setup secrets and recovery plaintext are returned once and never stored in receipts/audit.
 export async function staffSecurityAction(s,u,b,ctx,now=Date.now()){
- identity(u,ctx,now);await encryptionKey(ctx);
+ identity(s,u,ctx,now);await encryptionKey(ctx);
  if(!['begin','confirm','verify','recover','rotate-recovery','lock'].includes(b.action))fail('Действие защиты недоступно.',422);
  const q=record(s,u);
  if(b.action==='lock'){delete q.sessions[ctx.sessionId];audit(s,u,'mfa-session-lock','ok',now);return {ok:true};}

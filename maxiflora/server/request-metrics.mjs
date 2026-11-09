@@ -1,0 +1,8 @@
+// Server-local bounded telemetry: no bodies, query strings, addresses, cookies or personal data.
+import path from 'node:path';
+import {readFileSync,writeFileSync,renameSync} from 'node:fs';
+const root=process.env.MAXIFLORA_APP_ROOT||process.cwd(),file=path.join(root,'.request-metrics.json'),temp=path.join(root,'.request-metrics.tmp');
+const bounds=[50,100,250,500,1000,2500,5000,10000,Infinity];let state={startedAt:Date.now(),requests:0,serverErrors:0,buckets:Array(bounds.length).fill(0),lastErrors:[]},lastSave=0;
+try{const value=JSON.parse(readFileSync(file,'utf8'));if(value.version===1&&Array.isArray(value.buckets)&&value.buckets.length===bounds.length)state=value}catch{}
+export function recordRequest({id,path,status,duration,time}){state.requests++;if(status>=500)state.serverErrors++;const bucket=bounds.findIndex(b=>duration<=b);state.buckets[Math.max(0,bucket)]++;if(status>=500)state.lastErrors.unshift({id,path,status,duration:Math.round(duration),time});state.lastErrors=state.lastErrors.slice(0,50);state.updatedAt=time;if(status>=500||time-lastSave>10000){try{writeFileSync(temp,JSON.stringify({...state,version:1}),{mode:0o600});renameSync(temp,file);lastSave=time}catch{}}}
+export function requestMetrics(){let maintenance=null;try{const v=JSON.parse(readFileSync(path.join(root,'.maintenance-status.json'),'utf8'));maintenance={ok:v.ok,completedAt:v.completedAt,error:typeof v.error==='string'&&/^MAINTENANCE_[A-Z0-9_]+$/.test(v.error)?v.error:null}}catch{}return {...structuredClone(state),bucketUpperMs:bounds.map(v=>Number.isFinite(v)?v:null),process:{uptimeSeconds:Math.round(process.uptime()),rssBytes:process.memoryUsage().rss,heapBytes:process.memoryUsage().heapUsed},maintenance};}

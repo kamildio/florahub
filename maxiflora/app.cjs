@@ -1,5 +1,6 @@
 // Plesk Passenger supplies PORT. Standalone server starts in production mode.
 process.env.NODE_ENV='production';
+process.env.MAXIFLORA_APP_ROOT=__dirname;
 // Private fallback for hosting secrets not forwarded by Passenger. Never packaged.
 const secretsFile=__dirname+'/.runtime-secrets.env';
 try{const fs=require('node:fs');if(!fs.existsSync(secretsFile))fs.writeFileSync(secretsFile,'',{mode:0o600,flag:'wx'});fs.chmodSync(secretsFile,0o600);process.loadEnvFile(secretsFile)}catch{console.error('MaXiFlora private settings: unavailable')}
