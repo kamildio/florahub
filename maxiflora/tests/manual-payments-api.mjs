@@ -1,3 +1,4 @@
+import {PAYMENT_TERMS_VERSION} from '../lib/maxiflora/payment-terms.mjs';
 // Real handler with an isolated synthetic database; no production credentials or external requests.
 import assert from 'node:assert/strict';import {createHash} from 'node:crypto';import {register} from 'node:module';
 register('./fixtures/acceptance-loader.mjs',import.meta.url);
@@ -14,7 +15,7 @@ const setup=await (await post('staff-security',{action:'begin'})).json();assert.
 
 env.MANUAL_PAYMENTS_ENABLED='true';env.PAYMENTS_BOT_TOKEN='123456789:'+ 'x'.repeat(30);env.PAYMENTS_CHAT_ID='123456789';
 let sent=0;globalThis.fetch=async()=>{sent++;return {ok:true,json:async()=>({ok:true})}};
-const op=body=>({...body,operationId:crypto.randomUUID()});
+const op=body=>({...body,...(body.action==='create'?{acceptedTerms:true,termsVersion:PAYMENT_TERMS_VERSION}:{}),operationId:crypto.randomUUID()});
 assert.equal((await post('payments',op({action:'create',plan:'Start',tariffRevision:1}),null)).status,401);
 const create=op({action:'create',plan:'Start',tariffRevision:1});let r=await post('payments',create,buyerToken);assert.equal(r.status,200);const invoice=(await r.json()).invoice;
 assert.deepEqual((await (await post('payments',create,buyerToken)).json()).invoice,invoice);

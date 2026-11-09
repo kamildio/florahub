@@ -1,3 +1,4 @@
+import {PAYMENT_TERMS_VERSION,paymentTerms,paymentSupport,paymentReviewDue} from './payment-terms.mjs';
 import {DomainError} from './engine.mjs';
 import {requireHomeEditor} from './home-content.mjs';
 import {tariffPlansFor,tariffRevision} from './launch-policy.mjs';
@@ -8,9 +9,9 @@ const text=(v,max=500)=>{if(typeof v!=='string'||!v.trim()||v.trim().length>max|
 const hash=async v=>Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(v))),x=>x.toString(16).padStart(2,'0')).join('');
 export const billingConfigured=env=>env?.MANUAL_PAYMENTS_ENABLED==='true'&&/^\d{6,16}:[A-Za-z0-9_-]{20,}$/.test(env.PAYMENTS_BOT_TOKEN||'')&&/^\d{5,20}$/.test(env.PAYMENTS_CHAT_ID||'');
 const ensure=s=>s.billing??={revision:1,invoices:[],grants:[],audit:[],outbox:[]};
-const ownInvoice=i=>({id:i.id,number:i.number,plan:i.plan,price:i.price,currency:'KZT',status:i.status,createdAt:i.createdAt,expiresAt:i.expiresAt,reportedAt:i.reportedAt,decidedAt:i.decidedAt,reason:i.reason,startsAt:i.startsAt,endsAt:i.endsAt});
+const ownInvoice=i=>({id:i.id,number:i.number,plan:i.plan,price:i.price,currency:'KZT',status:i.status,createdAt:i.createdAt,expiresAt:i.expiresAt,reportedAt:i.reportedAt,reviewDueAt:i.reviewDueAt,termsVersion:i.termsVersion,decidedAt:i.decidedAt,reason:i.reason,startsAt:i.startsAt,endsAt:i.endsAt});
 export function paymentView(s,u,env,now=Date.now()){
- const c=s.billing;return {payments:{available:billingConfigured(env),url:billingConfigured(env)?paymentPolicy.url:null,recipient:paymentPolicy.recipient,invoices:u?(c?.invoices||[]).filter(i=>i.accountId===u.id).slice(-30).reverse().map(ownInvoice):[],scheduled:u?(c?.grants||[]).filter(g=>g.accountId===u.id&&g.status==='queued').map(g=>({id:g.id,plan:g.plan,startsAt:g.startsAt,endsAt:g.endsAt})):[]}};
+ const c=s.billing;return {payments:{termsVersion:PAYMENT_TERMS_VERSION,terms:paymentTerms,support:paymentSupport,available:billingConfigured(env),url:billingConfigured(env)?paymentPolicy.url:null,recipient:paymentPolicy.recipient,invoices:u?(c?.invoices||[]).filter(i=>i.accountId===u.id).slice(-30).reverse().map(ownInvoice):[],scheduled:u?(c?.grants||[]).filter(g=>g.accountId===u.id&&g.status==='queued').map(g=>({id:g.id,plan:g.plan,startsAt:g.startsAt,endsAt:g.endsAt})):[]}};
 }
 export async function billingAdminView(s,u,ctx,env,now=Date.now()){
  try{await requireHomeEditor(s,u,ctx,false,now)}catch(e){if(e instanceof DomainError)return {billingAdmin:null};throw e}
@@ -43,17 +44,18 @@ export async function paymentAction(s,u,b,env,now=Date.now()){
  const prior=s.receipts?.[key];if(prior){if(prior.fingerprint!==fp)fail('Идентификатор использован для другой заявки.',409);return prior.result}
  let i;
  if(b.action==='create'){
+  if(b.acceptedTerms!==true||b.termsVersion!==PAYMENT_TERMS_VERSION)fail('Ознакомьтесь с текущими условиями оплаты и подтвердите согласие.',409);
   const p=tariffPlansFor(s).find(p=>p.id===b.plan);if(!p)fail('Выберите тариф.');if(b.tariffRevision!==tariffRevision(s))fail('Цены изменились. Обновите страницу.',409);
   i=c.invoices.find(i=>i.accountId===u.id&&(i.status==='review'||i.status==='awaiting'&&i.expiresAt>now));
   if(i&&i.plan!==p.id)fail('Сначала отмените текущую заявку или дождитесь её проверки.',409);
-  if(!i){if(c.invoices.filter(x=>x.accountId===u.id&&x.createdAt>now-86400000).length>=10)fail('Лимит 10 заявок в сутки. Обратитесь в поддержку.',429);const id=crypto.randomUUID();i={id,number:'MF-'+id.toUpperCase(),accountId:u.id,plan:p.id,price:p.price,limit:p.limit,tariffRevision:tariffRevision(s),createdAt:now,expiresAt:now+86400000,status:'awaiting',version:1};c.invoices.push(i);c.revision++;}
+  if(!i){if(c.invoices.filter(x=>x.accountId===u.id&&x.createdAt>now-86400000).length>=10)fail('Лимит 10 заявок в сутки. Обратитесь в поддержку.',429);const id=crypto.randomUUID();i={id,number:'MF-'+id.toUpperCase(),accountId:u.id,plan:p.id,price:p.price,limit:p.limit,tariffRevision:tariffRevision(s),createdAt:now,expiresAt:now+86400000,termsVersion:PAYMENT_TERMS_VERSION,termsAcceptedAt:now,termsSnapshot:structuredClone(paymentTerms),status:'awaiting',version:1};c.invoices.push(i);c.revision++;}
  }else{
   i=c.invoices.find(i=>i.id===b.id&&i.accountId===u.id);if(!i)fail('Заявка не найдена.',404);
   if(b.action==='paid'&&i.status==='review')return {invoice:ownInvoice(i)};
   if(i.status!=='awaiting')fail('Состояние заявки изменилось.',409);
   if(b.action==='paid'){
    if(i.expiresAt<=now)fail('Срок заявки истёк. Создайте новую. Если деньги уже отправлены, обратитесь в поддержку.',409);
-   i.status='review';i.reportedAt=now;c.outbox.push({id:crypto.randomUUID(),invoiceId:i.id,status:'pending',attempts:0,nextAt:now});
+   i.status='review';i.reportedAt=now;i.reviewDueAt=paymentReviewDue(now);c.outbox.push({id:crypto.randomUUID(),invoiceId:i.id,status:'pending',attempts:0,nextAt:now});
   }else i.status='cancelled';i.version++;c.revision++;
  }
  const result={invoice:ownInvoice(i)};s.receipts??={};s.receipts[key]={fingerprint:fp,result,time:now};return result;

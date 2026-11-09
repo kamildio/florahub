@@ -1,5 +1,5 @@
 // Owner-supplied business payment link. Receiving a link does not enable billing.
-// Enable only after invoices, reconciliation, operator access and launch terms are ready.
+// Runtime admission is controlled by MANUAL_PAYMENTS_ENABLED in manual-payments.mjs.
 export const paymentPolicy=Object.freeze({
  provider:'kaspi-pay',
  url:'https://pay.kaspi.kz/pay/03wnshty',
@@ -7,5 +7,4 @@ export const paymentPolicy=Object.freeze({
  currency:'KZT',
  purpose:'platform-tariffs',
  reconciliation:'manual',
- enabled:false,
 });
