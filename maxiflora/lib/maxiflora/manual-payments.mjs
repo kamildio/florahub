@@ -95,7 +95,7 @@ export async function billingAdminAction(s,u,b,ctx,now=Date.now()){
 // Durable outbox; no bank confirmation or client identity is transmitted to Telegram.
 export function claimPaymentNotice(s,now){const c=s.billing;if(!c)return null;const n=c.outbox.find(n=>n.status!=='sent'&&n.nextAt<=now&&(!n.leaseUntil||n.leaseUntil<=now));if(!n)return null;const invoice=c.invoices.find(i=>i.id===n.invoiceId);if(!invoice||invoice.status!=='review'){n.status='sent';return null}n.lease=crypto.randomUUID();n.leaseUntil=now+60000;n.attempts++;return {id:n.id,lease:n.lease,number:invoice.number,plan:invoice.plan,price:invoice.price}}
 export function finishPaymentNotice(s,job,ok,now){const n=s.billing?.outbox.find(n=>n.id===job.id&&n.lease===job.lease);if(!n)return;n.status=ok?'sent':'pending';n.nextAt=now+Math.min(3600000,60000*2**Math.min(n.attempts,6));n.leaseUntil=null;delete n.lease;}
-export async function sendPaymentNotice(env,job,send=fetch){
+export async function sendPaymentNotice(env,job,send=env.PAYMENTS_TELEGRAM_FETCH||fetch){
  if(!billingConfigured(env))return false;
  try{const r=await send('https://api.telegram.org/bot'+env.PAYMENTS_BOT_TOKEN+'/sendMessage',{method:'POST',redirect:'error',signal:AbortSignal.timeout(10000),headers:{'content-type':'application/json'},body:JSON.stringify({chat_id:env.PAYMENTS_CHAT_ID,text:'MaXiFlora · Заявка на проверку оплаты\n'+job.number+'\nТариф: '+job.plan+'\nСумма: '+job.price+' ₸\nПроверьте поступление в Kaspi Pay и обработайте заявку в кабинете.\nhttps://www.maxiflora.kz/#admin',link_preview_options:{is_disabled:true}})});if(!r.ok)return false;const data=await r.json();return data.ok===true}catch{return false}
 }

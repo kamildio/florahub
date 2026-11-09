@@ -1,9 +1,11 @@
+import {telegramCurl} from './telegram-transport.mjs';
 import {nodeDatabase} from './mysql-store.mjs';
 import {smtpConfigured,sendVerificationEmail} from './smtp-mail.mjs';
 
 // No demo or in-memory fallback on the production hosting.
 export const env={
  DB:nodeDatabase(),
+ PAYMENTS_TELEGRAM_FETCH:telegramCurl,
  ...Object.fromEntries(['AUTH_CODE_SECRET','WHATSAPP_ENABLED','WHATSAPP_CONSENT_APPROVED_VERSION','WHATSAPP_ACCESS_TOKEN','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_AUTH_TEMPLATE','WHATSAPP_TEMPLATE_LANGUAGE'].map(key=>[key,process.env[key]])),
  ...Object.fromEntries(['MANUAL_PAYMENTS_ENABLED','PAYMENTS_BOT_TOKEN','PAYMENTS_CHAT_ID'].map(key=>[key,process.env[key]])),
  EMAIL_CONFIGURED:smtpConfigured(process.env),
