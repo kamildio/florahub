@@ -76,3 +76,5 @@ server-private/
 *.tar*
 
 .payments-test-status.json
+
+.hosting-cleanup-status.json

@@ -48,8 +48,8 @@ export function accountEmailStatus(){return {...emailStatus};}
 export function nodeDatabase(){return createDatabase({async execute(...args){return (await readyPool()).execute(...args)},async getConnection(){return (await readyPool()).getConnection()}},async()=>{await readyPool();return emailStatus.ready});}
 
 export const schema=[
- 'CREATE TABLE IF NOT EXISTS accounts (id VARCHAR(200) COLLATE utf8mb4_bin PRIMARY KEY,phone VARCHAR(32) COLLATE utf8mb4_bin NOT NULL UNIQUE,email VARCHAR(254) COLLATE utf8mb4_bin NULL UNIQUE,password TEXT NOT NULL,profile LONGTEXT NOT NULL) ENGINE=InnoDB',
- 'CREATE TABLE IF NOT EXISTS workspaces (id VARCHAR(200) COLLATE utf8mb4_bin PRIMARY KEY,revision BIGINT NOT NULL DEFAULT 0,state LONGTEXT NOT NULL) ENGINE=InnoDB',
- 'CREATE TABLE IF NOT EXISTS sessions (token VARCHAR(64) COLLATE utf8mb4_bin PRIMARY KEY,account VARCHAR(200) COLLATE utf8mb4_bin NOT NULL,workspace VARCHAR(200) COLLATE utf8mb4_bin NOT NULL,expires BIGINT NOT NULL,INDEX sessions_account (account),INDEX sessions_expiry (expires)) ENGINE=InnoDB',
- 'CREATE TABLE IF NOT EXISTS login_attempts (`key` VARCHAR(200) COLLATE utf8mb4_bin PRIMARY KEY,`count` INT NOT NULL DEFAULT 0,`reset` BIGINT NOT NULL) ENGINE=InnoDB'
+ 'CREATE TABLE IF NOT EXISTS accounts (id VARCHAR(200) COLLATE utf8mb4_bin PRIMARY KEY,phone VARCHAR(32) COLLATE utf8mb4_bin NOT NULL UNIQUE,email VARCHAR(254) COLLATE utf8mb4_bin NULL UNIQUE,password TEXT NOT NULL,profile LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin',
+ 'CREATE TABLE IF NOT EXISTS workspaces (id VARCHAR(200) COLLATE utf8mb4_bin PRIMARY KEY,revision BIGINT NOT NULL DEFAULT 0,state LONGTEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin',
+ 'CREATE TABLE IF NOT EXISTS sessions (token VARCHAR(64) COLLATE utf8mb4_bin PRIMARY KEY,account VARCHAR(200) COLLATE utf8mb4_bin NOT NULL,workspace VARCHAR(200) COLLATE utf8mb4_bin NOT NULL,expires BIGINT NOT NULL,INDEX sessions_account (account),INDEX sessions_expiry (expires)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin',
+ 'CREATE TABLE IF NOT EXISTS login_attempts (`key` VARCHAR(200) COLLATE utf8mb4_bin PRIMARY KEY,`count` INT NOT NULL DEFAULT 0,`reset` BIGINT NOT NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin'
 ];
