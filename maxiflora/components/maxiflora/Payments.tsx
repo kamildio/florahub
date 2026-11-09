@@ -3,11 +3,12 @@ import {useEffect,useRef,useState} from 'react';
 type Row=Record<string,any>;
 const date=(n:number)=>new Intl.DateTimeFormat('ru-RU',{timeZone:'Asia/Almaty',dateStyle:'medium',timeStyle:'short'}).format(n);
 const labels:Row={awaiting:'Ожидает оплаты',review:'Проверяем поступление',confirmed:'Подтверждена',rejected:'Отклонена',cancelled:'Отменена'};
-export default function Payments({plans,tariffRevision,profile,lang,request,onRefresh}:{plans:readonly Row[];tariffRevision:number;profile?:Row;lang:string;request:(path:string,body?:Row)=>Promise<Row>;onRefresh:()=>Promise<any>}){
+export default function Payments({initial,plans,tariffRevision,profile,lang,request,onRefresh}:{initial?:Row;plans:readonly Row[];tariffRevision:number;profile?:Row;lang:string;request:(path:string,body?:Row)=>Promise<Row>;onRefresh:()=>Promise<any>}){
  const [acceptedTerms,setAcceptedTerms]=useState(false);
- const [data,setData]=useState<Row|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');const pending=useRef<Record<string,string>>({});const t=(r:string,k:string)=>lang==='ru'?r:k;
+ const [data,setData]=useState<Row|null>(initial||null),[busy,setBusy]=useState(false),[error,setError]=useState('');const pending=useRef<Record<string,string>>({});const t=(r:string,k:string)=>lang==='ru'?r:k;
  async function load(){const value=await request('payments');setData(value.payments)}
  useEffect(()=>{if(profile)load().catch(e=>setError(e.message))},[profile?.id]);
+ useEffect(()=>{if(initial)setData(initial)},[initial]);
  async function act(body:Row){if(busy)return;setBusy(true);setError('');const key=JSON.stringify(body);pending.current[key]??=crypto.randomUUID();try{await request('payments',{...body,operationId:pending.current[key]});delete pending.current[key];await load();await onRefresh()}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
  if(!profile)return null;
  return <section className="card payment-panel"><div className="sectiontitle"><h2>{t('Оплата подписки через Kaspi','Kaspi арқылы жазылым төлеу')}</h2><button className="btn small secondary" disabled={busy} onClick={()=>load().catch(e=>setError(e.message))}>{t('Обновить статус','Мәртебені жаңарту')}</button></div>

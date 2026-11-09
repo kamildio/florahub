@@ -7,7 +7,7 @@ const price=(value:number)=>new Intl.NumberFormat('ru-RU').format(value)+' ₸';
 export default function TariffAccount({subscription,lang,onOpen,onClear,busy=false}:{subscription?:Row;lang:string;onOpen?:()=>void;onClear?:()=>void;busy?:boolean}){
  const t=(ru:string,kk:string)=>lang==='ru'?ru:kk;
  if(!subscription)return null;
- const {trial,activePlan,preference}=subscription,free=trial?.status==='active'&&activePlan===trial.plan;
+ const {trial,activePlan,preference}=subscription,free=trial?.status==='active'&&activePlan===trial.plan&&subscription.planUntil===trial.endsAt;
  return <section className="tariff-account" aria-label={t('Ваш тариф и выбор','Тарифіңіз бен таңдауыңыз')}>
   <div className="tariff-access"><div className="tariff-panel-label"><ShieldCheck size={19}/>{t('Действующий доступ','Қолданыстағы қолжетімділік')}</div><h2>{activePlan||t('Тариф для продаж не подключён','Сату тарифі қосылмаған')}</h2>
    {activePlan?<><span className={'tag '+(free?'':'gray')}>{free?t('Бесплатный месяц','Тегін ай'):t('Активен','Белсенді')}</span><p>{t('Действует до ','Мерзімі: ')}{campaignMoment(subscription.planUntil,lang)}</p><small>{t('Лимит активных карточек: ','Белсенді карточкалар шектеуі: ')}{subscription.activeOfferLimit??'∞'}</small>{free&&<small>{t('Осталось дней: ','Қалған күн: ')}{trial.daysLeft}</small>}</>:<p>{trial?t('Бесплатный месяц завершён. Новые продажи откроются после подключения тарифа.','Тегін ай аяқталды. Жаңа сатылымдар тариф қосылғаннан кейін ашылады.'):t('Вы можете выбирать цветы, вести переписку и готовить профиль поставщика.','Гүл таңдап, хат алмасып, жеткізуші профилін дайындай аласыз.')}</p>}
