@@ -88,3 +88,9 @@
 .payment-panel{margin-top:24px}.payment-panel>p{margin:14px 0;line-height:1.7}.payment-invoice{padding:20px 0;border-top:1px solid var(--line);margin-top:18px}.payment-invoice p{margin:10px 0}.payment-invoice small{overflow-wrap:anywhere}.payment-panel a.btn{text-decoration:none;display:inline-flex;align-items:center}.billing-admin>h3,.billing-admin>details{margin:24px 0 16px}.billing-admin .admin-list p,.billing-admin .admin-list small{overflow-wrap:anywhere}.billing-admin>.note{margin:16px 0}.billing-admin form{margin:20px 0}.billing-admin textarea{width:100%;min-height:80px}.payment-panel .sectiontitle{flex-wrap:wrap}.billing-admin article{min-width:0}
 
 .payment-terms-check{display:flex;align-items:flex-start;gap:10px;margin:20px 0;font-size:14px;line-height:1.65}.payment-terms-check input{width:18px;height:18px;flex:none;margin-top:3px}.payment-panel a:not(.btn){color:#b93241;text-decoration:underline;text-underline-offset:3px}.payment-invoice .btnrow{margin:12px 0}
+
+/* Consent must not inherit stacked field layout or full-size form input metrics. */
+.payment-panel .payment-terms-check{display:flex;flex-direction:row;align-items:flex-start;justify-content:flex-start;gap:12px;padding:12px 14px;min-height:0;border:1px solid #e4e7ec;border-radius:10px;background:#fafbfc;cursor:pointer}
+.payment-panel .payment-terms-check>input{display:block;appearance:auto;width:18px;min-width:18px;max-width:18px;height:18px;min-height:18px;flex:0 0 18px;margin:2px 0 0;padding:0;accent-color:#e52f48}
+.payment-panel .payment-terms-check>span{display:block;min-width:0;line-height:1.5}
+.billing-decision{scroll-margin-top:24px;margin:20px 0}.billing-decision-security:empty{display:none}.billing-decision-security .staff-security{margin-bottom:16px}
