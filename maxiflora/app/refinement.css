@@ -197,3 +197,50 @@
 @media screen and (max-width:650px){.staff-security{padding:16px}.staff-security .sectiontitle{margin-top:0}.staff-security h2{font-size:18px}.staff-security .textbtn{font-size:12px}.staff-security form .btn{white-space:normal}}
 @media screen{.integration-checks{list-style:none;padding:0;margin:18px 0 0}.integration-checks li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);font-size:14px}.integration-checks li:last-child{border-bottom:0}.integration-checks .tag{flex-shrink:0;font-size:11px}}
 @media screen and (max-width:360px){.integration-checks li{align-items:flex-start;flex-direction:column;gap:6px}}
+/* Supplier QA: prevent squeezed trial text and keep stock actions in view. */
+@media screen and (max-width:800px){
+ .trial-status{display:grid;grid-template-columns:24px minmax(0,1fr);align-items:start;gap:12px;padding:18px}
+ .trial-status>svg{margin-top:2px}.trial-status>div{min-width:0}
+ .trial-status>.btn{grid-column:2;justify-self:start;margin:2px 0 0;max-width:100%}
+ .trial-status h2{font-size:18px;line-height:1.4}.trial-status p{font-size:13px;line-height:1.65}.trial-status small{font-size:12px;line-height:1.6}
+}
+@media screen and (max-width:650px){
+ .stocktable:has(.stock-overview-table){padding:0;border:0;background:transparent}
+ .stocktable .tablewrap:has(.stock-overview-table){overflow:visible}
+ .stock-overview-table{display:block;width:100%;min-width:0}
+ .stock-overview-table thead{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+ .stock-overview-table tbody{display:grid;gap:14px}
+ .stock-overview-table tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 10px;padding:18px 16px;border:1px solid var(--line);border-radius:12px;background:#fff}
+ .stocktable .stock-overview-table td{display:block;min-width:0;max-width:100%;padding:0;border:0;font-size:17px;font-variant-numeric:tabular-nums;vertical-align:top;white-space:normal}
+ .stocktable .stock-overview-table td:first-child{grid-column:1/-1;min-width:0;font-size:15px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+ .stock-overview-table td[data-label]::before{content:attr(data-label);display:block;font-size:10px;color:var(--muted);line-height:1.5;min-height:30px;margin-bottom:5px;font-variant-numeric:normal}
+ .stocktable .stock-overview-table td small{font-size:11px;line-height:1.6;overflow-wrap:anywhere}
+ .stocktable .stock-overview-table td:first-child small{font-size:12px;margin-top:5px}
+ .stocktable .stock-overview-table .stock-actions-cell{grid-column:1/-1;padding-top:14px;border-top:1px solid var(--line)}
+ .stocktable .stock-overview-table .btnrow{margin:0;display:flex;flex-wrap:wrap;gap:8px}
+ .stock-overview-table .btnrow>.btn{flex:1;min-height:44px;font-size:13px}
+ .stock-overview-table .btnrow>.iconbtn{width:44px;height:44px;flex:none}
+}
+@media screen and (max-width:650px){
+ .tablewrap:has(>.stock-movements-table),.tablewrap:has(>.order-items-table),.tablewrap:has(>.cart-items-table){overflow:visible}
+ .stock-movements-table,.order-items-table,.cart-items-table{display:block;min-width:0;width:100%}
+ .stock-movements-table thead,.order-items-table thead,.cart-items-table thead{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap}
+ .stock-movements-table tbody,.order-items-table tbody,.cart-items-table tbody{display:grid;gap:16px}
+ .stock-movements-table tr,.order-items-table tr,.cart-items-table tr{display:grid;gap:10px;padding:16px 0;border-bottom:1px solid var(--line);grid-template-columns:minmax(0,1fr) auto}
+ .stock-movements-table td,.order-items-table td,.cart-items-table td{display:block;padding:0;border:0;min-width:0!important;white-space:normal;font-size:14px;line-height:1.6;overflow-wrap:anywhere}
+ .stock-movements-table td:first-child{grid-column:1/-1;color:var(--muted);font-size:11px}
+ .stock-movements-table td:nth-child(2){font-weight:600}.stock-movements-table td:nth-child(3){grid-column:1;font-size:12px;color:var(--muted)}
+ .stock-movements-table td:last-child{grid-column:2;grid-row:2/4;align-self:center;font-weight:600;font-size:17px;font-variant-numeric:tabular-nums}
+ .order-items-table tr{grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 10px}
+ .order-items-table td:first-child{grid-column:1/-1;font-size:15px}
+ .order-items-table td[data-label]::before,.cart-items-table td[data-label]::before{content:attr(data-label);display:block;font-size:11px;font-weight:400;color:var(--muted);line-height:1.5;margin-bottom:6px}
+ .order-items-table td small,.cart-items-table td small{font-size:11px;line-height:1.6}
+ .order-items-table td:last-child{font-weight:600}
+ .cart-items-table tr{position:relative;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+ .cart-items-table td:first-child{grid-column:1/-1;padding-right:36px;font-size:15px}
+ .cart-items-table td:last-child{position:absolute;right:0;top:16px}
+ .cart-items-table .close{width:32px;height:32px}
+ .cart-items-table .cartqty{font-size:16px;width:100%;max-width:110px;min-height:44px}
+ .cart-items-table td:nth-child(3){font-weight:600;font-size:16px}
+ .purchase-total{align-items:flex-start}.purchase-total>span{min-width:0;line-height:1.5}.purchase-total>b{flex-shrink:0}
+}
