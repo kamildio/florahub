@@ -1,3 +1,4 @@
+import {whatsappReadiness} from '../../../../lib/maxiflora/whatsapp-readiness.mjs';
 import {operationsView,operationsAction,supplierBannerView} from '../../../../lib/maxiflora/operations.mjs';
 import {hasStaffPermission} from '../../../../lib/maxiflora/staff-permissions.mjs';
 import {paymentView,paymentAction,billingAdminView,billingAdminAction,claimPaymentNotice,finishPaymentNotice,sendPaymentNotice,billingConfigured} from '../../../../lib/maxiflora/manual-payments.mjs';
@@ -191,7 +192,7 @@ async function handle(r){try{
   const {result}=await mutate(ws,(s,time)=>operationsAction(s,s.profiles[auth.account],b,staffContext,time));return json(result);
  }
  if(path==='monitoring'&&method==='GET'){
-  if(!auth)error('Войдите в аккаунт.',401);const s=JSON.parse((await load(ws)).state);await requireHomeEditor(s,s.profiles[auth.account],staffContext,false,Date.now(),'monitoring');return json({monitoring:typeof env.REQUEST_METRICS==='function'?env.REQUEST_METRICS():null});
+  if(!auth)error('Войдите в аккаунт.',401);const s=JSON.parse((await load(ws)).state);await requireHomeEditor(s,s.profiles[auth.account],staffContext,false,Date.now(),'monitoring');return json({monitoring:typeof env.REQUEST_METRICS==='function'?env.REQUEST_METRICS():null,whatsappReadiness:whatsappReadiness(env)});
  }
  if(path==='payments'&&method==='GET'){if(!auth)error('Войдите в аккаунт.',401);const {s}=await mutate(ws,()=>null);return json(paymentView(s,s.profiles[auth.account],env));}
  if(['payments','billing-admin'].includes(path)&&method==='POST'){

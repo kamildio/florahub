@@ -195,3 +195,5 @@
  .staff-security-check input{flex:0 0 18px;width:18px;height:18px;min-height:18px;margin-top:3px}
 }
 @media screen and (max-width:650px){.staff-security{padding:16px}.staff-security .sectiontitle{margin-top:0}.staff-security h2{font-size:18px}.staff-security .textbtn{font-size:12px}.staff-security form .btn{white-space:normal}}
+@media screen{.integration-checks{list-style:none;padding:0;margin:18px 0 0}.integration-checks li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);font-size:14px}.integration-checks li:last-child{border-bottom:0}.integration-checks .tag{flex-shrink:0;font-size:11px}}
+@media screen and (max-width:360px){.integration-checks li{align-items:flex-start;flex-direction:column;gap:6px}}
