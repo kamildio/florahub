@@ -1,6 +1,6 @@
 import {activeCities} from './cities.mjs';
 import {catalogEntryEnabled,availableBaseProducts,categoryLabels} from './catalog-directory.mjs';
-import {companyTypes,normalizedEmail,validEmail} from './company-profile.mjs';
+import {companyTypes,normalizedEmail,validEmail,supplierIssues} from './company-profile.mjs';
 import {PRIVACY_VERSION} from './privacy-policy.mjs';
 import {minimumOrder,validateMinimum} from './order-minimum.mjs';
 import {activeOfferLimit} from './launch-policy.mjs';
@@ -106,6 +106,13 @@ export function apply(s,u,body,now=Date.now()){
  }
  if(kind==='profile'){
   const fields=['companyType','name','contact','city','email','address','bin','legalAddress','bank'];const p=s.profiles[u.id]||{...u};
+  if(body.city!==undefined&&p.supplier&&p.city&&body.city!==p.city)fail('Город поставщика закреплён.');
+  if(p.supplier){
+   const candidate={...p};
+   for(const k of fields)if(typeof body[k]==='string')candidate[k]=body[k].trim();
+   const issues=supplierIssues(candidate,s);
+   if(issues.length)fail(issues.join(' '));
+  }
   const changed=fields.some(k=>typeof body[k]==='string'&&body[k].trim()!==(p[k]||''));
   if(body.companyType!==undefined&&!companyTypes.includes(body.companyType))fail('Выберите ИП или ТОО.');
   if(body.city!==undefined&&!activeCities(s).includes(body.city))fail('Выберите город профиля из списка.');

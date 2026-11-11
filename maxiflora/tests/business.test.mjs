@@ -56,7 +56,7 @@ test('partial receipt exposes only genuinely free physical units as a linked sto
  action(s,o,'cancel',now+3,{reason:'Отмена'});assert.equal(stock.total,300);assert.equal(p.received,0);assert.equal(p.total,200);assert.equal(s.products.filter(x=>x.physicalPartOf===9).length,1);
 });
 test('warehouse address update affects future offers while preserving existing order pickup snapshots',()=>{
- const s=seed(now),o=order(s);apply(s,u,{action:'profile',address:'Шымкент · новый склад'},now+1);assert.equal(s.products[0].address,'Шымкент · новый склад');assert.equal(o.address,u.address);assert.equal(s.profiles[u.id].approved,true);
+ const s=seed(now),o=order(s);Object.assign(s.profiles[u.id],{bin:'000000000000',legalAddress:'Тестовый адрес',bank:'KZ770000000000000001'});apply(s,u,{action:'profile',address:'Шымкент · новый склад'},now+1);assert.equal(s.products[0].address,'Шымкент · новый склад');assert.equal(o.address,u.address);assert.equal(s.profiles[u.id].approved,true);
 });
 test('oversized monetary values are rejected before a reserve or an imprecise order total is created',()=>{
  const s=seed(now),p=s.products[0],q=s.products[1];for(const x of [p,q])Object.assign(x,{pack:1,price:1000000000,total:1000000000});

@@ -1,6 +1,6 @@
 import {PAYMENT_TERMS_VERSION,paymentTerms} from '../../../lib/maxiflora/payment-terms.mjs';
 import {WHATSAPP_CONSENT_VERSION} from '../../../lib/maxiflora/whatsapp-cloud.mjs';
-import {privacyTitle,privacySections,telegramSections,whatsappSections} from '../../../lib/maxiflora/privacy-policy.mjs';
+import {privacyTitle,privacySections,whatsappSections} from '../../../lib/maxiflora/privacy-policy.mjs';
 import Link from 'next/link';
 import {notFound} from 'next/navigation';
 import {env} from '#platform-runtime';
@@ -18,8 +18,7 @@ const documents:Record<string,{title:string;sections:{title:string;text:string}[
  {title:'Обращения',text:'По вопросам аккаунта, ошибок и действий на платформе обращайтесь по телефону оператора. Email поддержки: maxiflora2@gmail.com.'},
  ]},
  privacy:{title:privacyTitle,sections:privacySections},
- whatsapp:{title:'Отдельное согласие на WhatsApp',sections:whatsappSections},
- telegram:{title:'Отдельное согласие на Telegram Gateway',sections:telegramSections}
+ whatsapp:{title:'Отдельное согласие на WhatsApp',sections:whatsappSections}
 };
 export default async function Legal({params}:{params:Promise<{document:string}>}){
  const {document}=await params;const item=documents[document];if(!item)notFound();
