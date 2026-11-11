@@ -244,3 +244,6 @@
  .cart-items-table td:nth-child(3){font-weight:600;font-size:16px}
  .purchase-total{align-items:flex-start}.purchase-total>span{min-width:0;line-height:1.5}.purchase-total>b{flex-shrink:0}
 }
+
+/* A compact summary keeps the cabinet focused on daily work. */
+.tariff-account-compact .tariff-access,.tariff-account-compact .tariff-preference{padding:18px 22px}.tariff-account-compact h2{font-size:24px;margin:10px 0}.tariff-account-compact .tariff-account-footnote{display:none}.tariff-account-compact p{margin:8px 0}.tariff-account-compact .tariff-access>small{display:block}

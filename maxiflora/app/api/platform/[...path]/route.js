@@ -351,6 +351,7 @@ async function handle(r){try{
    else if(b.action==='assembly-ready')result=await batchReady(s,u,b,apply,time);
    else result=apply(s,u,b,time);
    if(b.action==='profile'&&b.submitForReview===true){const p=s.profiles[u.id];result={...result,...(p.supplier?submitSupplier(p,p.profileVersion||0,time,s):submitBuyer(p,p.profileVersion||0,time,s))};}
+   if(result?.submitted&&env.STAFF_OWNER_ACCOUNT_ID){s.notifications??=[];s.notifications.unshift({id:crypto.randomUUID(),users:[env.STAFF_OWNER_ACCOUNT_ID],target:'admin',text:'Компания '+(s.profiles[u.id].name||'')+' отправила профиль на проверку.',time});}
    s.receipts[key]={fingerprint,result,time:Date.now()};return result;});if(b.action==='privacy-delete-request')await deliverDeletionNotice(ws);return json(result);
  }
  return json({error:'Раздел API не найден.'},404);

@@ -106,6 +106,7 @@ export function apply(s,u,body,now=Date.now()){
   allocateAll(s,now);return {results};
  }
  if(kind==='profile'){
+  if(typeof body.bank==='string')body={...body,bank:body.bank.replace(/\s/g,'').toUpperCase()};
   const fields=['companyType','name','contact','city','email','address','bin','legalAddress','bank'];const p=s.profiles[u.id]||{...u};
   if(body.city!==undefined&&p.supplier&&p.city&&body.city!==p.city)fail('Город поставщика закреплён.');
   if(body.profileVersion!==undefined&&body.profileVersion!==(p.profileVersion||0))fail('Профиль изменился. Обновите данные.',409);

@@ -14,9 +14,9 @@ test('signup validates trimmed contacts, repeated password and explicit consents
  const d=registrationDetails(input);assert.equal(d.phone,proof.phone);assert.equal(d.email,'hello@example.test');assert.equal(d.name,'Клиент');
  for(const bad of [{companyType:'PERSON'},{companyType:''},{companyType:undefined},{agreement:'true'},{telegramConsent:false},{marketing:'yes'},{privacy:1},{passwordConfirmation:'other'},{name:'\n'},{email:'x'},{password:'short',passwordConfirmation:'short'}])assert.throws(()=>registrationDetails({...input,...bad}));
 });
-test('verified signup persists one phone, hashed password, consent and one MAX month without granting staff/seller approval',async()=>{
+test('verified signup persists one phone, hashed password, consent and deferred MAX eligibility without granting staff/seller approval',async()=>{
  const database=db(),a=await createVerifiedAccount(database,input,proof,password,now),stored=await database.prepare('SELECT * FROM accounts WHERE phone=?').bind(proof.phone).first(),p=JSON.parse(stored.profile);
- assert.equal(stored.id,a.id);assert.equal(stored.password,'hashed:long-password');assert.equal(p.companyType,'IP');assert.equal(p.companyApproved,false);assert.equal(p.name,'');assert.equal(p.contact,'Клиент');assert.equal(p.phoneVerified,true);assert.equal(p.verified,false);assert.equal(p.approved,false);assert.equal(p.role,undefined);assert.equal(p.plan,'MAX');assert.equal(p.planUntil,addAlmatyMonths(now,1));assert.equal(p.consent.agreement,CONSENT_VERSION);assert.equal(p.consent.privacy,PRIVACY_VERSION);
+ assert.equal(stored.id,a.id);assert.equal(stored.password,'hashed:long-password');assert.equal(p.companyType,'IP');assert.equal(p.companyApproved,false);assert.equal(p.name,'');assert.equal(p.contact,'Клиент');assert.equal(p.phoneVerified,true);assert.equal(p.verified,false);assert.equal(p.approved,false);assert.equal(p.role,undefined);assert.equal(p.plan,null);assert.equal(p.launchTrial,undefined);assert.equal(p.pendingLaunchTrial.plan,'MAX');assert.equal(p.consent.agreement,CONSENT_VERSION);assert.equal(p.consent.privacy,PRIVACY_VERSION);
  assert.equal(stored.profile.includes('long-password'),false);
  await assert.rejects(createVerifiedAccount(database,input,proof,password,now),e=>e.status===409);assert.equal(database.raw.prepare('SELECT count(*) AS n FROM accounts').get().n,1);
 });

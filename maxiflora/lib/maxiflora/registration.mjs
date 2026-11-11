@@ -4,7 +4,7 @@ import {PRIVACY_VERSION} from './privacy-policy.mjs';
 import {DomainError} from './engine.mjs';
 import {companyTypes} from './company-profile.mjs';
 import {normalizePhone} from './auth-codes.mjs';
-import {enrollNewAccount} from './subscriptions.mjs';
+import {registerTrialEligibility} from './subscriptions.mjs';
 export const CONSENT_VERSION='launch-v3';
 const fail=(message,status=422)=>{throw new DomainError(message,status)};
 export function registrationDetails(input){
@@ -39,7 +39,7 @@ export async function createVerifiedAccount(database,input,proof,hashPassword,no
   profile.emailVerification={email:details.email,verifiedAt:proof.verifiedAt,challengeId:proof.challengeId,method:'smtp-code'};
  }
  profile.consentHistory=[{kind:'personal-data',...profile.consent},...(emailSignup?[]:[{kind:details.channel,...profile[details.channel+'Consent']}]),{kind:'marketing',...profile.marketingConsent}];
- enrollNewAccount(profile,now);
+ registerTrialEligibility(profile,now);
  const encoded=JSON.stringify(profile),password=await hashPassword(details.password);
  try{await database.prepare('INSERT INTO accounts (id,phone,email,password,profile) VALUES (?,?,?,?,?)').bind(id,details.phone,details.email,password,encoded).run()}catch(e){if(String(e).includes('UNIQUE'))fail('Аккаунт уже существует. Войдите по коду.',409);throw e;}
  return {id,phone:details.phone,profile:encoded};

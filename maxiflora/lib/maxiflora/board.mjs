@@ -10,7 +10,7 @@ export const boardCategories=[
  {id:'equipment',ru:'Оборудование',kk:'Жабдықтар',units:['piece','set','day','month']},
  {id:'decor',ru:'Декор и аксессуары',kk:'Декор мен керек-жарақ',units:['piece','set','pack','meter','box']},
  {id:'services',ru:'Услуги',kk:'Қызметтер',units:['service','hour','visit','order','day','month']},
- {id:'other',ru:'Другое',kk:'Басқа',units:['piece','pack','box','set','roll','sheet','meter','square-meter','cubic-meter','gram','kilogram','milliliter','liter','bag']}
+ {id:'other',ru:'Аренда помещений',kk:'Үй-жайды жалға беру',units:['square-meter','month','day','piece','pack','box','set','roll','sheet','meter','cubic-meter','gram','kilogram','milliliter','liter','bag']}
 ];
 export const boardUnits={piece:['шт.','дана'],pack:['упаковка','қаптама'],box:['коробка','қорап'],set:['комплект','жиынтық'],roll:['рулон','орам'],sheet:['лист','парақ'],meter:['метр','метр'],'square-meter':['м²','м²'],'cubic-meter':['м³','м³'],gram:['грамм','грамм'],kilogram:['кг','кг'],milliliter:['мл','мл'],liter:['литр','литр'],bag:['мешок','қап'],service:['услуга','қызмет'],hour:['час','сағат'],visit:['выезд','бару'],order:['заказ','тапсырыс'],day:['сутки','тәулік'],month:['месяц','ай']};
 const active=(ad,now)=>ad.status==='published'&&ad.expires>now;

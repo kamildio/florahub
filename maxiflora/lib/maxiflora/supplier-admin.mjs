@@ -1,3 +1,4 @@
+import {activateCompanyTrial} from './subscriptions.mjs';
 import {DomainError} from './engine.mjs';
 import {supplierIssues,buyerIssues} from './company-profile.mjs';
 import {requireStaffConfirmation} from './staff-security.mjs';
@@ -18,7 +19,7 @@ export function supplierAdminAction(s,actor,b,ctx,now=Date.now()){
   if(b.action==='bank-approve'){const issues=supplierIssues({...p,bank:p.pendingBank},s);if(issues.length)throw new DomainError(issues.join(' '),422);p.bank=p.pendingBank;}delete p.pendingBank;
  }else{
   if(p.supplierStatus!=='pending')throw new DomainError('Профиль не находится на проверке.',409);
-  if(b.action==='approve'){const issues=supplierIssues(p,s);if(issues.length)throw new DomainError(issues.join(' '),422);p.approved=true;p.complete=true;p.supplierStatus='approved';p.companyApproved=true;p.companyStatus='approved';}
+  if(b.action==='approve'){const issues=supplierIssues(p,s);if(issues.length)throw new DomainError(issues.join(' '),422);p.approved=true;p.complete=true;p.supplierStatus='approved';p.companyApproved=true;p.companyStatus='approved';activateCompanyTrial(p,now);}
   else{p.approved=false;p.supplierStatus='rejected';}
   p.supplierReview={actor:actor.id,time:now,reason:b.reason.trim(),decision:b.action};
  }
@@ -42,7 +43,7 @@ function reviewBuyer(s,actor,p,b,now){
  p.companyApproved=b.action==='approve';p.companyStatus=p.companyApproved?'approved':'rejected';
  p.companyReview={actor:actor.id,time:now,reason:b.reason.trim(),decision:b.action};
  p.profileVersion=(p.profileVersion||0)+1;
- if(p.companyApproved)p.complete=true;
+ if(p.companyApproved){p.complete=true;activateCompanyTrial(p,now);}
  const entry={id:crypto.randomUUID(),actor:actor.id,subject:p.id,role:'buyer',action:b.action,reason:b.reason.trim(),time:now,version:p.profileVersion,before,after:{approved:p.companyApproved,status:p.companyStatus}};
  s.supplierAdminAudit??=[];s.supplierAdminAudit.push(entry);
  p.profileHistory??=[];p.profileHistory.push({event:'company-'+b.action,actor:actor.id,time:now,version:p.profileVersion,reason:b.reason.trim()});

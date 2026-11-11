@@ -61,3 +61,10 @@ test('buyer company review requires legal identity and email, then enables check
  assert.equal(p.companyStatus,'rejected');assert.equal(p.companyReview.reason,'Correct legal details');
  submitBuyer(p,p.profileVersion,now+3,s);assert.equal(p.companyStatus,'pending');
 });
+
+test('owner approval starts deferred MAX without consuming it during profile edits or rejection',async()=>{
+ const {registerTrialEligibility}=await import('../lib/maxiflora/subscriptions.mjs');
+ const {s,p,ctx}=await context();registerTrialEligibility(p,now);assert.equal(p.launchTrial,undefined);
+ submitSupplier(p,p.profileVersion,now,s);supplierAdminAction(s,owner,{action:'reject',id:p.id,profileVersion:p.profileVersion,reason:'Нужно уточнить адрес'},ctx,now+1);assert.equal(p.launchTrial,undefined);
+ submitSupplier(p,p.profileVersion,now+2,s);supplierAdminAction(s,owner,{action:'approve',id:p.id,profileVersion:p.profileVersion,reason:'Реквизиты проверены'},ctx,now+3);assert.equal(p.launchTrial.startsAt,now+3);assert.equal(p.plan,'MAX');assert.equal(p.pendingLaunchTrial,undefined);
+});

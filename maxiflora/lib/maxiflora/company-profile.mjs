@@ -17,7 +17,10 @@ export function supplierIssues(p,s){const issues=[];
  if(!/^\d{12}$/.test(p.bin||''))issues.push('ИИН или БИН должен содержать 12 цифр.');
  if(typeof p.legalAddress!=='string'||p.legalAddress.trim().length<5)issues.push('Укажите юридический адрес.');
  if(typeof p.address!=='string'||p.address.trim().length<5)issues.push('Укажите адрес склада в городе профиля.');
- if(!ibanValid(p.bank))issues.push('Укажите корректный ИИК Казахстана, начинающийся с KZ.');
+ const iban=String(p.bank||'').replace(/\s/g,'').toUpperCase();
+ if(iban.length!==20)issues.push('ИИК должен содержать ровно 20 символов, включая KZ. Сейчас: '+iban.length+'.');
+ else if(!/^KZ\d{2}[A-Z0-9]{16}$/.test(iban))issues.push('Проверьте формат ИИК: KZ, две цифры и 16 латинских букв или цифр.');
+ else if(!ibanValid(iban))issues.push('Контрольные цифры ИИК не совпадают. Скопируйте полный ИИК из реквизитов банка.');
  return issues;
 }
 export function submitSupplier(p,version,now=Date.now(),s){

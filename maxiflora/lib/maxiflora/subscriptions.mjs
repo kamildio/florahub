@@ -21,6 +21,19 @@ export function enrollNewAccount(u,now=Date.now(),policy=launchPolicy){
  u.launchTrial={campaignId:campaign.id,revision:campaign.revision,startsAt:now,endsAt:addAlmatyMonths(now,1),plan:campaign.trialPlan};
  u.plan=campaign.trialPlan;u.planUntil=u.launchTrial.endsAt;
 }
+// Eligibility is fixed at registration; the month starts only after company approval.
+export function registerTrialEligibility(u,now=Date.now(),policy=launchPolicy){
+ if(u.registeredAt!==undefined||u.launchTrial)return;
+ u.registeredAt=now;const campaign=campaignView(now,policy);
+ if(campaign.status==='active')u.pendingLaunchTrial={campaignId:campaign.id,revision:campaign.revision,plan:campaign.trialPlan};
+}
+export function activateCompanyTrial(u,now=Date.now()){
+ if(!u.pendingLaunchTrial||u.launchTrial)return false;
+ // Never displace an existing paid or manually granted subscription.
+ if(u.plan&&u.planUntil>now)return false;
+ u.launchTrial={...u.pendingLaunchTrial,startsAt:now,endsAt:addAlmatyMonths(now,1)};
+ u.plan=u.launchTrial.plan;u.planUntil=u.launchTrial.endsAt;delete u.pendingLaunchTrial;return true;
+}
 export function upgradeLaunchTrial(u,now=Date.now()){
  const trial=u?.launchTrial;if(!trial||trial.campaignId!==launchPolicy.id||trial.plan!=='Start'||trial.endsAt<=now)return false;
  trial.plan='MAX';trial.revision=launchPolicy.revision;
@@ -45,7 +58,7 @@ export function tariffHistoryPage(u,before){
 }
 export function subscriptionView(u,now=Date.now(),s){
  const trial=u?.launchTrial;
- return {campaign:campaignView(now),subscription:u?{trial:trial?{campaignId:trial.campaignId,startsAt:trial.startsAt,endsAt:trial.endsAt,plan:trial.plan,status:now<trial.endsAt?'active':'expired',daysLeft:Math.max(0,Math.ceil((trial.endsAt-now)/DAY))}:null,activePlan:u.plan&&u.planUntil>now?u.plan:null,planUntil:u.planUntil||null,activeOfferLimit:u.plan&&u.planUntil>now?(Number.isFinite(activeOfferLimit(u.plan,s,u))?activeOfferLimit(u.plan,s,u):null):null,preference:u.tariffPreference?{...u.tariffPreference}:null,preferenceVersion:u.tariffVersion||0,history:tariffHistoryPage(u),paymentAvailable:false}:null};
+ return {campaign:campaignView(now),subscription:u?{pendingTrial:!!u.pendingLaunchTrial,scheduled:(s?.billing?.grants||[]).filter(g=>g.accountId===u.id&&g.status==='queued').map(g=>({id:g.id,plan:g.plan,startsAt:g.startsAt,endsAt:g.endsAt})),confirmedPreference:u.tariffPreference?(s?.billing?.invoices||[]).filter(i=>i.accountId===u.id&&i.status==='confirmed'&&i.plan===u.tariffPreference.plan&&i.createdAt>=u.tariffPreference.selectedAt&&i.endsAt>now&&!(s?.billing?.grants||[]).some(g=>g.id===i.grantId&&g.status==='revoked')).map(i=>({id:i.id,plan:i.plan,status:i.status,startsAt:i.startsAt,endsAt:i.endsAt})).at(-1)||null:null,trial:trial?{campaignId:trial.campaignId,startsAt:trial.startsAt,endsAt:trial.endsAt,plan:trial.plan,status:now<trial.endsAt?'active':'expired',daysLeft:Math.max(0,Math.ceil((trial.endsAt-now)/DAY))}:null,activePlan:u.plan&&u.planUntil>now?u.plan:null,planUntil:u.planUntil||null,activeOfferLimit:u.plan&&u.planUntil>now?(Number.isFinite(activeOfferLimit(u.plan,s,u))?activeOfferLimit(u.plan,s,u):null):null,preference:u.tariffPreference?{...u.tariffPreference}:null,preferenceVersion:u.tariffVersion||0,history:tariffHistoryPage(u),paymentAvailable:false}:null};
 }
 export function subscriptionAction(s,u,b,now=Date.now()){
  if(!u)fail('Войдите для выбора тарифа.',401);
