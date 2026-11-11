@@ -1,3 +1,4 @@
+import {actionableWindow} from './admin-queues.mjs';
 import {PAYMENT_TERMS_VERSION,paymentTerms,paymentSupport,paymentReviewDue} from './payment-terms.mjs';
 import {DomainError} from './engine.mjs';
 import {requireHomeEditor} from './home-content.mjs';
@@ -16,7 +17,7 @@ export function paymentView(s,u,env,now=Date.now()){
 export async function billingAdminView(s,u,ctx,env,now=Date.now()){
  try{await requireHomeEditor(s,u,ctx,false,now,'billing')}catch(e){if(e instanceof DomainError)return {billingAdmin:null};throw e}
  const c=s.billing||{revision:1,invoices:[],grants:[],audit:[],outbox:[]};
- return {billingAdmin:{revision:c.revision,configured:billingConfigured(env),accounts:Object.values(s.profiles).map(p=>({id:p.id,name:p.name||p.contact||p.email||p.id,phone:p.phone,email:p.email,plan:p.plan,planUntil:p.planUntil,version:p.accessVersion||0})),invoices:c.invoices.slice(-200).reverse().map(i=>({...ownInvoice(i),accountId:i.accountId,version:i.version,bankReference:i.bankReference,delivery:c.outbox.find(x=>x.invoiceId===i.id)?.status||null})),grants:c.grants.slice(-200).reverse(),audit:c.audit.slice(-100).reverse()}};
+ return {billingAdmin:{revision:c.revision,configured:billingConfigured(env),accounts:Object.values(s.profiles).map(p=>({id:p.id,name:p.name||p.contact||p.email||p.id,phone:p.phone,email:p.email,plan:p.plan,planUntil:p.planUntil,version:p.accessVersion||0})),invoices:actionableWindow(c.invoices,i=>i.status==='review').reverse().map(i=>({...ownInvoice(i),accountId:i.accountId,version:i.version,bankReference:i.bankReference,delivery:c.outbox.find(x=>x.invoiceId===i.id)?.status||null})),grants:c.grants.slice(-200).reverse(),audit:c.audit.slice(-100).reverse()}};
 }
 const audit=(c,u,event,target,details,now)=>{c.audit.push({id:crypto.randomUUID(),actorId:u.id,event,target,...details,time:now});c.audit=c.audit.slice(-1000);c.revision++};
 function grant(s,c,account,plan,limit,price,revision,months,source,now){

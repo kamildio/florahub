@@ -1,3 +1,4 @@
+import {actionableWindow} from './admin-queues.mjs';
 import {DomainError} from './engine.mjs';
 import {requireHomeEditor,homeAssets,ensureHomeContent} from './home-content.mjs';
 import {staffRoles,staffPermissions} from './staff-permissions.mjs';
@@ -13,8 +14,8 @@ export async function operationsView(s,u,ctx,now=Date.now()){
  const permissions=staffPermissions(s,u,ctx),out={operationsAdmin:null};if(!permissions.length)return out;
  try{await requireHomeEditor(s,u,ctx,false,now,permissions[0])}catch(e){if(e instanceof DomainError)return out;throw e}
  const allowed=p=>permissions.includes(p);out.operationsAdmin={permissions,roles:staffRoles,
- ...(allowed('ads')?{banners:(s.supplierBanners||[]).slice(-200).reverse().map(x=>({...displayed(x,now),accountName:s.profiles[x.accountId]?.name}))}:{}),
- ...(allowed('support')?{cases:(s.supportCases||[]).slice(0,200).map(c=>({...c,version:c.version||1,participants:c.participants.map(id=>({id,name:s.profiles[id]?.name||'Клиент'})),order:c.orderId?(()=>{const o=s.orders.find(o=>o.id===c.orderId);return o?{id:o.id,status:o.status,buyer:o.buyer,supplier:o.supplier,items:o.items.map(x=>({name:x.name,qty:x.qty})),history:o.history,discipline:o.discipline}:null})():null}))}:{}),
+ ...(allowed('ads')?{banners:actionableWindow(s.supplierBanners||[],x=>['pending','approved'].includes(displayed(x,now).status)).reverse().map(x=>({...displayed(x,now),accountName:s.profiles[x.accountId]?.name}))}:{}),
+ ...(allowed('support')?{cases:actionableWindow([...(s.supportCases||[])].reverse(),c=>!['resolved','closed'].includes(c.status)).sort((a,b)=>(b.updated||b.created)-(a.updated||a.created)).map(c=>({...c,version:c.version||1,participants:c.participants.map(id=>({id,name:s.profiles[id]?.name||'Клиент'})),order:c.orderId?(()=>{const o=s.orders.find(o=>o.id===c.orderId);return o?{id:o.id,status:o.status,buyer:o.buyer,supplier:o.supplier,items:o.items.map(x=>({name:x.name,qty:x.qty})),history:o.history,discipline:o.discipline}:null})():null}))}:{}),
  ...(allowed('staff')?{members:Object.entries(s.staffMembers||{}).map(([id,x])=>({id,...x,name:s.profiles[id]?.name,email:s.profiles[id]?.email})),accounts:Object.values(s.profiles||{}).filter(p=>p.id!==ctx.ownerId&&p.verified&&p.verificationMethod==='email').map(p=>({id:p.id,name:p.name,email:p.email})),audit:(s.operationsAudit||[]).slice(-100).reverse()}:{}),
  };return out;
 }

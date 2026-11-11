@@ -247,3 +247,5 @@
 
 /* A compact summary keeps the cabinet focused on daily work. */
 .tariff-account-compact .tariff-access,.tariff-account-compact .tariff-preference{padding:18px 22px}.tariff-account-compact h2{font-size:24px;margin:10px 0}.tariff-account-compact .tariff-account-footnote{display:none}.tariff-account-compact p{margin:8px 0}.tariff-account-compact .tariff-access>small{display:block}
+
+.admin-queue-summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;margin-bottom:16px;border-bottom:1px solid var(--line)}.admin-queue-badge{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:20px;background:#fff0f2;color:#c8233e;font-size:12px;font-weight:700}.admin-hub-grid em.admin-queue-pending{color:#b51e35;background:#fff0f2;border-radius:6px;padding:4px 8px;display:inline-block}@media(max-width:480px){.admin-queue-summary{align-items:flex-start;flex-direction:column}}
