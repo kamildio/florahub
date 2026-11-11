@@ -34,3 +34,30 @@ test('supplier save rejects missing mandatory details without partial changes; b
 
 
 test('legacy personal-name repair preserves trial and legal-company edits and runs only once',()=>{const s=seed(now),p={id:'legacy',name:'Personal name',contact:'',approved:false,complete:false,consent:{name:'Personal name'},trialStarted:now,trialEnds:now+1000};s.profiles.legacy=p;s.profiles.edited={...p,id:'edited',name:'Company name'};s.profiles.approved={...p,id:'approved',approved:true};processTimers(s,now);assert.equal(p.name,'');assert.equal(p.contact,'Personal name');assert.equal(p.trialStarted,now);assert.equal(p.trialEnds,now+1000);assert.equal(p.profileVersion,1);assert.equal(s.profiles.edited.name,'Company name');assert.equal(s.profiles.approved.name,'Personal name');processTimers(s,now);assert.equal(p.profileVersion,1);});
+
+test('buyer company review requires legal identity and email, then enables checkout and invalidates on legal edits',async()=>{
+ const {s,ctx}=await context();
+ const p={...supplier(),id:'buyer-company',supplier:false,approved:false,companyApproved:false,companyStatus:'draft',verified:true,verificationMethod:'email',bank:'',address:''};
+ s.profiles[p.id]=p;
+ const {submitBuyer,companyApproved,buyerIssues}=await import('../lib/maxiflora/company-profile.mjs');
+ assert.deepEqual(buyerIssues(p,s),[]);
+ assert.equal(companyApproved(p),false);
+ assert.throws(()=>apply(s,p,{action:'checkout',items:[]},now),e=>e.status===403);
+ const invalid={...p,companyType:'PERSON'};assert.throws(()=>submitBuyer(invalid,0,now,s),e=>e.status===422);
+ assert.throws(()=>submitBuyer({...p,verified:false},0,now,s),e=>e.status===422);
+ submitBuyer(p,0,now,s);
+ const b={action:'approve',id:p.id,profileVersion:1,reason:'Company verified'};
+ assert.throws(()=>supplierAdminAction(s,owner,b,{...ctx,sessionId:'other'},now),e=>e.status===401);
+ supplierAdminAction(s,owner,b,ctx,now);
+ assert.equal(companyApproved(p),true);
+ assert.equal(p.approved,false);
+ const view=supplierAdminView(s,owner,ctx,now);
+ assert.equal(view.buyers.find(x=>x.id===p.id).approved,true);
+ assert.throws(()=>supplierAdminAction(s,owner,b,ctx,now),e=>e.status===409);
+ apply(s,p,{action:'profile',legalAddress:'Updated legal address 2'},now+1);
+ assert.equal(companyApproved(p),false);assert.equal(p.companyStatus,'draft');
+ submitBuyer(p,p.profileVersion,now+2,s);
+ supplierAdminAction(s,owner,{action:'reject',id:p.id,profileVersion:p.profileVersion,reason:'Correct legal details'},ctx,now+2);
+ assert.equal(p.companyStatus,'rejected');assert.equal(p.companyReview.reason,'Correct legal details');
+ submitBuyer(p,p.profileVersion,now+3,s);assert.equal(p.companyStatus,'pending');
+});

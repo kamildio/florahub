@@ -1,14 +1,15 @@
 import {DomainError} from './engine.mjs';
-import {supplierIssues} from './company-profile.mjs';
+import {supplierIssues,buyerIssues} from './company-profile.mjs';
 import {requireStaffConfirmation} from './staff-security.mjs';
 export function supplierAdminView(s,actor,ctx,now=Date.now()){
  requireStaffConfirmation(s,actor,ctx,{now});
- return {suppliers:Object.values(s.profiles).filter(p=>p.supplier).map(p=>({id:p.id,companyType:p.companyType,name:p.name,contact:p.contact,city:p.city,email:p.email,phone:p.phone,bin:p.bin,legalAddress:p.legalAddress,address:p.address,bank:p.bank,pendingBank:p.pendingBank||null,approved:p.approved,supplierStatus:p.supplierStatus||(p.approved?'approved':'draft'),profileVersion:p.profileVersion||0,submittedAt:p.submittedAt||null,review:p.supplierReview||null,issues:supplierIssues(p,s)})),audit:(s.supplierAdminAudit||[]).slice(-100).reverse()};
+ return {suppliers:Object.values(s.profiles).filter(p=>p.supplier).map(p=>({id:p.id,companyType:p.companyType,name:p.name,contact:p.contact,city:p.city,email:p.email,phone:p.phone,bin:p.bin,legalAddress:p.legalAddress,address:p.address,bank:p.bank,pendingBank:p.pendingBank||null,approved:p.approved,supplierStatus:p.supplierStatus||(p.approved?'approved':'draft'),profileVersion:p.profileVersion||0,submittedAt:p.submittedAt||null,review:p.supplierReview||null,issues:supplierIssues(p,s)})),buyers:Object.values(s.profiles).filter(p=>!p.supplier).map(p=>({id:p.id,companyType:p.companyType,name:p.name,contact:p.contact,city:p.city,email:p.email,phone:p.phone,bin:p.bin,legalAddress:p.legalAddress,approved:p.companyApproved===true,supplierStatus:p.companyStatus||(p.companyApproved?'approved':'draft'),profileVersion:p.profileVersion||0,submittedAt:p.submittedAt||null,review:p.companyReview||null,issues:buyerIssues(p,s),buyer:true})),audit:(s.supplierAdminAudit||[]).slice(-100).reverse()};
 }
 export function supplierAdminAction(s,actor,b,ctx,now=Date.now()){
  requireStaffConfirmation(s,actor,ctx,{critical:true,now});
  if(!['approve','reject','bank-approve','bank-reject'].includes(b.action))throw new DomainError('Действие недоступно.',403);
- const p=s.profiles[b.id];if(!p?.supplier)throw new DomainError('Поставщик не найден.',404);
+ const p=s.profiles[b.id];if(!p)throw new DomainError('Компания не найдена.',404);
+ if(!p.supplier)return reviewBuyer(s,actor,p,b,now);
  if(!Number.isSafeInteger(b.profileVersion)||b.profileVersion!==(p.profileVersion||0))throw new DomainError('Профиль изменился. Откройте актуальную версию.',409);
  if(typeof b.reason!=='string'||b.reason.trim().length<3||b.reason.length>1000)throw new DomainError('Укажите основание решения от 3 до 1000 символов.',422);
  const before={approved:p.approved,status:p.supplierStatus||'draft',bank:p.bank,pendingBank:p.pendingBank||null};
@@ -17,7 +18,7 @@ export function supplierAdminAction(s,actor,b,ctx,now=Date.now()){
   if(b.action==='bank-approve'){const issues=supplierIssues({...p,bank:p.pendingBank},s);if(issues.length)throw new DomainError(issues.join(' '),422);p.bank=p.pendingBank;}delete p.pendingBank;
  }else{
   if(p.supplierStatus!=='pending')throw new DomainError('Профиль не находится на проверке.',409);
-  if(b.action==='approve'){const issues=supplierIssues(p,s);if(issues.length)throw new DomainError(issues.join(' '),422);p.approved=true;p.complete=true;p.supplierStatus='approved';}
+  if(b.action==='approve'){const issues=supplierIssues(p,s);if(issues.length)throw new DomainError(issues.join(' '),422);p.approved=true;p.complete=true;p.supplierStatus='approved';p.companyApproved=true;p.companyStatus='approved';}
   else{p.approved=false;p.supplierStatus='rejected';}
   p.supplierReview={actor:actor.id,time:now,reason:b.reason.trim(),decision:b.action};
  }
@@ -25,5 +26,26 @@ export function supplierAdminAction(s,actor,b,ctx,now=Date.now()){
  const entry={id:crypto.randomUUID(),actor:actor.id,subject:p.id,action:b.action,reason:b.reason.trim(),time:now,version:p.profileVersion,before,after:{approved:p.approved,status:p.supplierStatus,bank:p.bank,pendingBank:p.pendingBank||null}};
  s.supplierAdminAudit??=[];s.supplierAdminAudit.push(entry);p.profileHistory??=[];p.profileHistory.push({event:b.action,actor:actor.id,time:now,version:p.profileVersion,reason:b.reason.trim()});
  s.notifications.unshift({id:crypto.randomUUID(),users:[p.id],target:'profile',text:b.action==='approve'?'Профиль поставщика одобрен. Можно публиковать предложения в пределах тарифа.':b.action==='reject'?'Профиль поставщика возвращён: '+b.reason.trim():b.action==='bank-approve'?'Новые банковские реквизиты одобрены.':'Изменение банковских реквизитов отклонено: '+b.reason.trim(),time:now});
+ return {ok:true,profileVersion:p.profileVersion};
+}
+
+function reviewBuyer(s,actor,p,b,now){
+ if(!['approve','reject'].includes(b.action))throw new DomainError('Для покупателя доступна проверка компании.',403);
+ if(b.profileVersion!==(p.profileVersion||0))throw new DomainError('Профиль изменился. Откройте актуальную версию.',409);
+ if(typeof b.reason!=='string'||b.reason.trim().length<3||b.reason.length>1000)throw new DomainError('Укажите основание решения от 3 до 1000 символов.',422);
+ if(p.companyStatus!=='pending')throw new DomainError('Компания не находится на проверке.',409);
+ if(b.action==='approve'){
+  const issues=buyerIssues(p,s);if(issues.length)throw new DomainError(issues.join(' '),422);
+  if(!p.verified)throw new DomainError('Email компании не подтверждён.',422);
+ }
+ const before={approved:p.companyApproved===true,status:p.companyStatus};
+ p.companyApproved=b.action==='approve';p.companyStatus=p.companyApproved?'approved':'rejected';
+ p.companyReview={actor:actor.id,time:now,reason:b.reason.trim(),decision:b.action};
+ p.profileVersion=(p.profileVersion||0)+1;
+ if(p.companyApproved)p.complete=true;
+ const entry={id:crypto.randomUUID(),actor:actor.id,subject:p.id,role:'buyer',action:b.action,reason:b.reason.trim(),time:now,version:p.profileVersion,before,after:{approved:p.companyApproved,status:p.companyStatus}};
+ s.supplierAdminAudit??=[];s.supplierAdminAudit.push(entry);
+ p.profileHistory??=[];p.profileHistory.push({event:'company-'+b.action,actor:actor.id,time:now,version:p.profileVersion,reason:b.reason.trim()});
+ s.notifications??=[];s.notifications.unshift({id:crypto.randomUUID(),users:[p.id],target:'profile',text:p.companyApproved?'Компания покупателя одобрена. Можно оформлять заказы.':'Компания покупателя возвращена: '+b.reason.trim(),time:now});
  return {ok:true,profileVersion:p.profileVersion};
 }

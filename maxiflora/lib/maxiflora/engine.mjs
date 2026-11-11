@@ -1,6 +1,6 @@
 import {activeCities} from './cities.mjs';
 import {catalogEntryEnabled,availableBaseProducts,categoryLabels} from './catalog-directory.mjs';
-import {companyTypes,normalizedEmail,validEmail,supplierIssues} from './company-profile.mjs';
+import {companyTypes,normalizedEmail,validEmail,supplierIssues,buyerIssues,companyApproved} from './company-profile.mjs';
 import {PRIVACY_VERSION} from './privacy-policy.mjs';
 import {minimumOrder,validateMinimum} from './order-minimum.mjs';
 import {activeOfferLimit} from './launch-policy.mjs';
@@ -21,7 +21,7 @@ export function responseDeadline(now) {
   if(h>=20)d.setUTCDate(d.getUTCDate()+1);
   d.setUTCHours(10,0,0,0);return d.getTime()-5*3600000;
 }
-const demoBuyer={id:'demo-buyer',companyType:'IP',name:'Цветочная «Лепесток»',contact:'Демо покупатель',city:'Шымкент',phone:'+77000000001',email:'buyer@example.test',verified:true,complete:true,supplier:false};
+const demoBuyer={id:'demo-buyer',companyType:'IP',name:'Цветочная «Лепесток»',contact:'Демо покупатель',city:'Шымкент',phone:'+77000000001',email:'buyer@example.test',verified:true,complete:true,supplier:false,companyApproved:true,companyStatus:'approved'};
 const demoSupplier={id:'demo-supplier',companyType:'TOO',name:'Flora Market',contact:'Демо поставщик',city:'Шымкент',phone:'+77000000002',email:'supplier@example.test',verified:true,complete:true,supplier:true,approved:true,plan:'MAX',planUntil:4102444800000,address:'Шымкент · тестовый склад',bin:'Тестовые данные'};
 export const demoProfiles={buyer:demoBuyer,supplier:demoSupplier};
 export function seed(now=Date.now()) {
@@ -79,18 +79,19 @@ export function processTimers(s,now){let changed=activateDueSubscriptions(s,now)
  if(!o.proposal&&o.status==='new'&&now>=o.responseBy){o.status='unconfirmed';release(s,o,now);event(s,o,'Поставщик не подтвердил заказ в срок. Резерв освобождён.',now);changed=true;}
  if(o.status==='ready'&&now>=o.pickupBy){o.status='overdue';event(s,o,'Истекли 24 часа на получение. Резерв сохранён.',now);changed=true;}
  }return changed;}
-function checkSupplier(p,s,now){const u=s.profiles[p.supplierId];return u?.approved&&u.plan&&u.planUntil>now&&(!p.transit||u.plan==='MAX');}
+function checkSupplier(p,s,now){const u=s.profiles[p.supplierId];return companyTypes.includes(u?.companyType)&&u?.complete&&u?.approved&&u.plan&&u.planUntil>now&&(!p.transit||u.plan==='MAX');}
 export function apply(s,u,body,now=Date.now()){
  const kind=body.action;
  if(kind==='supplier-enable'){
   if(u.supplier)return {ok:true};
-  if(!u.complete||!u.city||!u.name)fail('Сначала заполните профиль компании и город.');
+  if(!companyTypes.includes(u.companyType)||!u.complete||!u.city||!u.name)fail('Сначала заполните профиль компании и город.');
   u.supplier=true;u.approved=false;u.supplierStatus='draft';u.profileVersion=(u.profileVersion||0)+1;u.plan=u.launchTrial?.plan||null;u.supplierEnabledAt=now;return {ok:true};
  }
  if(kind==='notifications-read'){
   for(const n of s.notifications.filter(n=>n.users.includes(u.id))){n.readBy??=[];if(!n.readBy.includes(u.id))n.readBy.push(u.id);}return {ok:true};
  }
  if(kind==='checkout'){
+  if(!companyApproved(u))fail('Отправьте профиль ИП или ТОО на проверку. Оформление заказов откроется после одобрения компании.',403);
   if(!(u.verified===true||(u.phoneVerified===true&&['telegram-gateway','whatsapp-cloud'].includes(u.phoneVerificationMethod)))||!u.complete)fail('Для оформления заполните профиль и подтвердите телефон.',403);
   if(!Array.isArray(body.items)||!body.items.length||body.items.length>96)fail('Проверьте состав корзины.');
   const results=[],groups=new Map();
@@ -107,10 +108,11 @@ export function apply(s,u,body,now=Date.now()){
  if(kind==='profile'){
   const fields=['companyType','name','contact','city','email','address','bin','legalAddress','bank'];const p=s.profiles[u.id]||{...u};
   if(body.city!==undefined&&p.supplier&&p.city&&body.city!==p.city)fail('Город поставщика закреплён.');
-  if(p.supplier){
+  if(body.profileVersion!==undefined&&body.profileVersion!==(p.profileVersion||0))fail('Профиль изменился. Обновите данные.',409);
+  if((p.supplier&&body.saveDraft!==true)||body.submitForReview===true){
    const candidate={...p};
    for(const k of fields)if(typeof body[k]==='string')candidate[k]=body[k].trim();
-   const issues=supplierIssues(candidate,s);
+   const issues=(p.supplier?supplierIssues:buyerIssues)(candidate,s);
    if(issues.length)fail(issues.join(' '));
   }
   const changed=fields.some(k=>typeof body[k]==='string'&&body[k].trim()!==(p[k]||''));
@@ -121,11 +123,11 @@ export function apply(s,u,body,now=Date.now()){
    if(body[k].length>250)fail('Поле слишком длинное.');
    if(k==='city'&&p.supplier&&p.city&&body[k]!==p.city)fail('Город поставщика закреплён.');
    if(k==='email'&&body[k]!==p.email)p.verified=false;
-   if(['companyType','name','bin','legalAddress'].includes(k)&&body[k]!==p[k])p.approved=false;
+   if(['companyType','name','bin','legalAddress'].includes(k)&&body[k]!==p[k]){p.approved=false;p.companyApproved=false;p.companyStatus='draft';p.companyReview=null;}
    if(k==='bank'&&p.approved&&body[k]!==p.bank){p.pendingBank=body[k];continue;}p[k]=body[k].trim();
   }
-  if(changed){p.profileVersion=(p.profileVersion||0)+1;if(p.supplier&&!p.approved){p.supplierStatus='draft';p.supplierReview=null;}}
-  p.complete=!!(companyTypes.includes(p.companyType)&&p.name&&p.contact&&p.city&&p.phone&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email||''));
+  if(changed){p.profileVersion=(p.profileVersion||0)+1;if(p.supplier&&!p.approved){p.supplierStatus='draft';p.supplierReview=null;}if(!p.supplier&&!p.companyApproved){p.companyStatus='draft';p.companyReview=null;}}
+  p.complete=!!(companyTypes.includes(p.companyType)&&p.name&&p.contact&&p.city&&p.phone&&/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(p.email||''))&&(!p.supplier||supplierIssues(p,s).length===0);
   s.profiles[u.id]=p;if(p.supplier)for(const offer of s.products.filter(x=>x.supplierId===u.id)){offer.supplier=p.name;offer.address=p.address||'';offer.city=p.city;}return {profile:p};
  }
  if(kind==='message'){

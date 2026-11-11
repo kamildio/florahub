@@ -2,11 +2,13 @@ import {REGISTRATION_CHECKBOX_VERSION} from './registration-consent.mjs';
 import {requirePhoneConsent,phoneChannel,phoneMethod,verifiedPhoneMethod,channelConsentVersion} from './phone-channels.mjs';
 import {PRIVACY_VERSION} from './privacy-policy.mjs';
 import {DomainError} from './engine.mjs';
+import {companyTypes} from './company-profile.mjs';
 import {normalizePhone} from './auth-codes.mjs';
 import {enrollNewAccount} from './subscriptions.mjs';
 export const CONSENT_VERSION='launch-v3';
 const fail=(message,status=422)=>{throw new DomainError(message,status)};
 export function registrationDetails(input){
+ if(!companyTypes.includes(input.companyType))fail('Выберите ИП или ТОО.');
  const phone=normalizePhone(input.phone),name=typeof input.name==='string'?input.name.trim():'',email=typeof input.email==='string'?input.email.trim().toLowerCase():'';
  if(!name||name.length>120||/[\u0000-\u001f\u007f]/.test(name))fail('Укажите имя от 1 до 120 символов.');
  if(email.length>254||!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))fail('Укажите корректный email.');
@@ -16,7 +18,7 @@ export function registrationDetails(input){
  const channel=input.channel==='email'?'email':requirePhoneConsent(input);
  if(input.consentPresentation!==undefined&&(input.consentPresentation!==REGISTRATION_CHECKBOX_VERSION||input.marketing!==false))fail('Проверьте согласие и настройки сообщений.');
  if(input.marketing!==undefined&&typeof input.marketing!=='boolean')fail('Выберите настройку сообщений об акциях.');
- return {phone,name,email,channel,consentPresentation:input.consentPresentation||'separate-checkboxes',password:input.password,supplier:input.supplier===true,marketing:input.marketing===true};
+ return {phone,name,email,companyType:input.companyType,channel,consentPresentation:input.consentPresentation||'separate-checkboxes',password:input.password,supplier:input.supplier===true,marketing:input.marketing===true};
 }
 // Called only after a committed phone challenge proves ownership. Never take roles from client input.
 export async function createVerifiedAccount(database,input,proof,hashPassword,now=Date.now()){
@@ -26,7 +28,7 @@ export async function createVerifiedAccount(database,input,proof,hashPassword,no
  if(database.accountEmailReady&&!(await database.accountEmailReady()))fail('Регистрация временно недоступна. Попробуйте позже.',503);
  if(await database.prepare('SELECT * FROM accounts WHERE email=?').bind(details.email).first())fail('Не удалось зарегистрироваться с этими контактами. Используйте свой аккаунт или обратитесь в поддержку.',409);
  if(await database.prepare('SELECT * FROM accounts WHERE phone=?').bind(details.phone).first())fail('Аккаунт уже существует. Войдите по коду или восстановите пароль.',409);
- const id=crypto.randomUUID(),profile={id,phone:details.phone,name:'',email:details.email,contact:details.name,companyType:'',city:'',verified:false,phoneVerified:true,phoneVerificationMethod:emailSignup?null:phoneMethod(details.channel),phoneVerifiedAt:proof.verifiedAt,complete:false,supplier:details.supplier,approved:false,supplierStatus:'draft',profileVersion:0,plan:null,consent:{presentation:details.consentPresentation,agreement:CONSENT_VERSION,privacy:PRIVACY_VERSION,name:details.name,account:id,time:now,accepted:true,phoneMethod:emailSignup?null:phoneMethod(details.channel)},[details.channel+'Consent']:{presentation:details.consentPresentation,version:emailSignup?PRIVACY_VERSION:channelConsentVersion(details.channel),accepted:true,time:now,account:id,name:details.name},marketingConsent:{version:PRIVACY_VERSION,enabled:details.marketing,time:now,account:id,name:details.name,channel:'cabinet'}};
+ const id=crypto.randomUUID(),profile={id,phone:details.phone,name:'',email:details.email,contact:details.name,companyType:details.companyType,companyApproved:false,companyStatus:'draft',city:'',verified:false,phoneVerified:true,phoneVerificationMethod:emailSignup?null:phoneMethod(details.channel),phoneVerifiedAt:proof.verifiedAt,complete:false,supplier:details.supplier,approved:false,supplierStatus:'draft',profileVersion:0,plan:null,consent:{presentation:details.consentPresentation,agreement:CONSENT_VERSION,privacy:PRIVACY_VERSION,name:details.name,account:id,time:now,accepted:true,phoneMethod:emailSignup?null:phoneMethod(details.channel)},[details.channel+'Consent']:{presentation:details.consentPresentation,version:emailSignup?PRIVACY_VERSION:channelConsentVersion(details.channel),accepted:true,time:now,account:id,name:details.name},marketingConsent:{version:PRIVACY_VERSION,enabled:details.marketing,time:now,account:id,name:details.name,channel:'cabinet'}};
  if(emailSignup){
   profile.phoneVerified=false;
   delete profile.phoneVerifiedAt;

@@ -6,17 +6,17 @@ import {PRIVACY_VERSION} from '../lib/maxiflora/privacy-policy.mjs';
 import {seed,apply} from '../lib/maxiflora/engine.mjs';
 import {addAlmatyMonths} from '../lib/maxiflora/subscriptions.mjs';
 const now=Date.parse('2026-11-03T12:00:00+05:00');
-const input={phone:'8 (706) 000-00-00',name:'  Клиент  ',email:' HELLO@example.test ',password:'long-password',passwordConfirmation:'long-password',agreement:true,privacy:true,telegramConsent:true,marketing:false,supplier:true,approved:true,verified:true,role:'admin',plan:'Business'};
+const input={companyType:'IP',phone:'8 (706) 000-00-00',name:'  Клиент  ',email:' HELLO@example.test ',password:'long-password',passwordConfirmation:'long-password',agreement:true,privacy:true,telegramConsent:true,marketing:false,supplier:true,approved:true,verified:true,role:'admin',plan:'Business'};
 const proof={ok:true,phone:'+77060000000',purpose:'register',verifiedAt:now};
 const password=async value=>'hashed:'+value;
 function db(){const raw=new DatabaseSync(':memory:');raw.exec('CREATE TABLE accounts(id TEXT PRIMARY KEY,phone TEXT UNIQUE,email TEXT UNIQUE,password TEXT,profile TEXT)');return {prepare(sql){const stmt=raw.prepare(sql);return {bind(...params){return {first:async()=>stmt.get(...params)||null,run:async()=>({meta:{changes:stmt.run(...params).changes}})}}}},raw};}
 test('signup validates trimmed contacts, repeated password and explicit consents before a paid code',()=>{
  const d=registrationDetails(input);assert.equal(d.phone,proof.phone);assert.equal(d.email,'hello@example.test');assert.equal(d.name,'Клиент');
- for(const bad of [{agreement:'true'},{telegramConsent:false},{marketing:'yes'},{privacy:1},{passwordConfirmation:'other'},{name:'\n'},{email:'x'},{password:'short',passwordConfirmation:'short'}])assert.throws(()=>registrationDetails({...input,...bad}));
+ for(const bad of [{companyType:'PERSON'},{companyType:''},{companyType:undefined},{agreement:'true'},{telegramConsent:false},{marketing:'yes'},{privacy:1},{passwordConfirmation:'other'},{name:'\n'},{email:'x'},{password:'short',passwordConfirmation:'short'}])assert.throws(()=>registrationDetails({...input,...bad}));
 });
 test('verified signup persists one phone, hashed password, consent and one MAX month without granting staff/seller approval',async()=>{
  const database=db(),a=await createVerifiedAccount(database,input,proof,password,now),stored=await database.prepare('SELECT * FROM accounts WHERE phone=?').bind(proof.phone).first(),p=JSON.parse(stored.profile);
- assert.equal(stored.id,a.id);assert.equal(stored.password,'hashed:long-password');assert.equal(p.name,'');assert.equal(p.contact,'Клиент');assert.equal(p.phoneVerified,true);assert.equal(p.verified,false);assert.equal(p.approved,false);assert.equal(p.role,undefined);assert.equal(p.plan,'MAX');assert.equal(p.planUntil,addAlmatyMonths(now,1));assert.equal(p.consent.agreement,CONSENT_VERSION);assert.equal(p.consent.privacy,PRIVACY_VERSION);
+ assert.equal(stored.id,a.id);assert.equal(stored.password,'hashed:long-password');assert.equal(p.companyType,'IP');assert.equal(p.companyApproved,false);assert.equal(p.name,'');assert.equal(p.contact,'Клиент');assert.equal(p.phoneVerified,true);assert.equal(p.verified,false);assert.equal(p.approved,false);assert.equal(p.role,undefined);assert.equal(p.plan,'MAX');assert.equal(p.planUntil,addAlmatyMonths(now,1));assert.equal(p.consent.agreement,CONSENT_VERSION);assert.equal(p.consent.privacy,PRIVACY_VERSION);
  assert.equal(stored.profile.includes('long-password'),false);
  await assert.rejects(createVerifiedAccount(database,input,proof,password,now),e=>e.status===409);assert.equal(database.raw.prepare('SELECT count(*) AS n FROM accounts').get().n,1);
 });

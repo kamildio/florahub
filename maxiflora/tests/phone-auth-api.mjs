@@ -10,7 +10,7 @@ const origin='https://www.maxiflora.test';let calls=0,code='',transportFailure=f
 const original=globalThis.fetch;
 globalThis.fetch=async(url,options)=>{calls++;assert.equal(url,'https://graph.facebook.com/v24.0/123456789012345/messages');code=JSON.parse(options.body).template.components[0].parameters[0].text;return transportFailure?Response.json({error:{message:'secret-provider-error'}},{status:400}):Response.json({messaging_product:'whatsapp',messages:[{id:'wamid.test'}]});};
 async function post(path,body,session=cookie){return POST(new Request(origin+'/api/platform/'+path,{method:'POST',headers:{origin,'content-type':'application/json',cookie:session},body:JSON.stringify(body)}));}
-const details={channel:'whatsapp',phone:'+77060000001',name:'Synthetic Buyer',email:'buyer@example.test',password:'synthetic-password',passwordConfirmation:'synthetic-password',agreement:true,privacy:true,whatsappConsent:true,telegramConsent:false,marketing:false,purpose:'register',operationId:crypto.randomUUID()};
+const details={companyType:'IP',channel:'whatsapp',phone:'+77060000001',name:'Synthetic Buyer',email:'buyer@example.test',password:'synthetic-password',passwordConfirmation:'synthetic-password',agreement:true,privacy:true,whatsappConsent:true,telegramConsent:false,marketing:false,purpose:'register',operationId:crypto.randomUUID()};
 try{
  const state=await (await GET(new Request(origin+'/api/platform/state'))).json();assert.equal(state.phoneAuth.preferred,'whatsapp');assert.equal(state.phoneAuth.registration,true);assert.equal(JSON.stringify(state).includes(env.WHATSAPP_ACCESS_TOKEN),false);
  assert.equal((await post('auth-code-send',{...details,whatsappConsent:false})).status,422);assert.equal(calls,0);

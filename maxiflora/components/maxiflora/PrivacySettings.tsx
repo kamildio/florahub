@@ -1,11 +1,36 @@
 'use client';
 import {useState} from 'react';
-import {marketingChoice,privacyChoice,PRIVACY_VERSION} from '../../lib/maxiflora/privacy-policy.mjs';
+import {marketingChoice,PRIVACY_VERSION} from '../../lib/maxiflora/privacy-policy.mjs';
 type Row=Record<string,any>;
-export default function PrivacySettings({profile,lang,action,onRefresh}:{profile:Row;lang:string;action:(body:Row)=>Promise<Row>;onRefresh:()=>Promise<any>}){
- const [busy,setBusy]=useState(false),[message,setMessage]=useState('');const t=(ru:string,kk:string)=>lang==='ru'?ru:kk;
- async function toggle(enabled:boolean){if(busy)return;setBusy(true);setMessage('');try{await action({action:'privacy-marketing',enabled});await onRefresh();setMessage(enabled?t('Сообщения об акциях включены.','Акциялар туралы хабарламалар қосылды.'):t('Сообщения об акциях отключены. Служебные сообщения останутся.','Акциялар туралы хабарламалар өшірілді. Қызметтік хабарламалар сақталады.'))}catch(e){setMessage((e as Error).message)}finally{setBusy(false)}}
- const consent=profile.consent,selected=profile.marketingConsent?.enabled===true&&profile.marketingConsent?.version===PRIVACY_VERSION;
- const mail=(kind:string)=>'mailto:maxiflora2@gmail.com?subject='+encodeURIComponent('MaXiFlora · '+kind)+'&body='+encodeURIComponent('Кабинет: '+profile.id+'\nЗапрос: '+kind+'\nКомментарий: ');
- return <section className="card privacy-settings" id="privacy-settings" aria-labelledby="privacy-settings-title"><h2 id="privacy-settings-title">{t('Конфиденциальность','Құпиялылық')}</h2><p><a href="/legal/privacy" target="_blank" rel="noopener noreferrer">{t('Согласие на обработку данных','Деректерді өңдеуге келісім')}</a></p>{consent?.accepted&&<p className="subheading">{privacyChoice}<br/>{t('Принято: ','Қабылданды: ')}{new Intl.DateTimeFormat(lang==='ru'?'ru-RU':'kk-KZ',{timeZone:'Asia/Almaty',dateStyle:'medium',timeStyle:'short'}).format(consent.time)} · {consent.privacy}</p>}<label className="check"><input type="checkbox" checked={selected} disabled={busy} onChange={e=>toggle(e.target.checked)}/><span>{marketingChoice}</span></label>{message&&<p role="status">{message}</p>}<h3>{t('Обращения по данным','Деректер бойынша өтініштер')}</h3><p>{t('Запросить сведения, исправление, удаление или отозвать согласие можно по email оператора. Кнопка откроет вашу почту с номером кабинета; отправку подтверждаете вы.','Деректерді сұрату, түзету, жою немесе келісімді қайтарып алу үшін операторға хат жазыңыз. Батырма кабинет нөмірімен поштаңызды ашады; жіберуді өзіңіз растайсыз.')}</p><div className="btnrow">{['Сведения о данных','Исправление данных','Удаление аккаунта','Отзыв согласия'].map(kind=><a className="btn ghost small" key={kind} href={mail(kind)}>{kind}</a>)}</div><p><a href="mailto:maxiflora2@gmail.com">maxiflora2@gmail.com</a></p><small>{t('При отзыве оператор в течение 15 рабочих дней прекращает обработку либо предоставляет мотивированный отказ. Открытые обязательства и обязательные записи рассматриваются отдельно.','Келісім қайтарылғанда оператор 15 жұмыс күні ішінде өңдеуді тоқтатады не дәлелді бас тарту береді. Ашық міндеттемелер мен міндетті жазбалар бөлек қаралады.')}</small></section>;
+export default function PrivacySettings({profile,lang,action,onRefresh,onSupport}:{profile:Row;lang:string;action:(body:Row)=>Promise<Row>;onRefresh:()=>Promise<any>;onSupport:()=>void}){
+ const [busy,setBusy]=useState(false),[message,setMessage]=useState(''),[confirm,setConfirm]=useState(false),[reason,setReason]=useState(''),[requestId,setRequestId]=useState(''),[ticket,setTicket]=useState<number|null>(null);
+ const t=(ru:string,kk:string)=>lang==='ru'?ru:kk;
+ const selected=profile.marketingConsent?.enabled===true&&profile.marketingConsent?.version===PRIVACY_VERSION;
+ async function toggle(enabled:boolean){
+  if(busy)return;setBusy(true);setMessage('');
+  try{await action({action:'privacy-marketing',enabled});await onRefresh();setMessage(enabled?t('Сообщения об акциях включены.','Акциялар туралы хабарламалар қосылды.'):t('Сообщения об акциях отключены.','Акциялар туралы хабарламалар өшірілді.'))}
+  catch(e){setMessage((e as Error).message)}finally{setBusy(false)}
+ }
+ async function submit(e:React.FormEvent<HTMLFormElement>){
+  e.preventDefault();if(busy)return;setBusy(true);setMessage('');
+  try{
+   const result=await action({action:'privacy-delete-request',operationId:requestId,reason});
+   setTicket(result.number);setConfirm(false);await onRefresh();
+  }catch(e){setMessage((e as Error).message)}finally{setBusy(false)}
+ }
+ return <section className="card privacy-settings" id="privacy-settings" aria-labelledby="privacy-settings-title">
+  <h2 id="privacy-settings-title">{t('Конфиденциальность','Құпиялылық')}</h2>
+  <p><a href="/legal/privacy" target="_blank" rel="noopener noreferrer">{t('Согласие на обработку данных','Деректерді өңдеуге келісім')}</a></p>
+  <label className="check"><input type="checkbox" checked={selected} disabled={busy} onChange={e=>toggle(e.target.checked)}/><span>{marketingChoice}</span></label>
+  <h3>{t('Удаление аккаунта','Аккаунтты жою')}</h3>
+  <p>{t('Отправьте запрос прямо из кабинета. Он появится у администратора в обращениях; уведомление также поступит на рабочую почту. Оператор ответит в течение 15 рабочих дней.','Сұрауды кабинеттен жіберіңіз. Ол әкімші өтініштерінде пайда болады және жұмыс поштасына хабарлама жіберіледі. Оператор 15 жұмыс күні ішінде жауап береді.')}</p>
+  <small>{t('Перед удалением оператор проверит открытые заказы и обязательства. Документы, которые необходимо хранить по закону, сохраняются в необходимом объёме.','Жою алдында оператор ашық тапсырыстар мен міндеттемелерді тексереді. Заң бойынша сақтау қажет құжаттар қажетті көлемде сақталады.')}</small>
+  {ticket&&<div className="note" role="status">{t('Запрос зарегистрирован, № ','Сұрау тіркелді, № ')}{ticket}. <button type="button" className="btn ghost small" onClick={onSupport}>{t('Открыть обращения','Өтініштерді ашу')}</button></div>}
+  {message&&<p role="status" className="note">{message}</p>}
+  {confirm?<form onSubmit={submit} className="operations-form">
+   <p>{t('Подтвердите отправку запроса на удаление аккаунта.','Аккаунтты жою сұрауын жіберуді растаңыз.')}</p>
+   <label className="field">{t('Комментарий · необязательно','Түсініктеме · міндетті емес')}<textarea value={reason} onChange={e=>setReason(e.target.value)} maxLength={2000} disabled={busy}/></label>
+   <div className="btnrow"><button className="btn" disabled={busy}>{busy?t('Отправляем…','Жіберілуде…'):t('Отправить запрос','Сұрау жіберу')}</button><button className="btn secondary" type="button" disabled={busy} onClick={()=>setConfirm(false)}>{t('Отмена','Болдырмау')}</button></div>
+  </form>:<p><button className="btn secondary" type="button" disabled={busy||ticket!==null} onClick={()=>{setRequestId(crypto.randomUUID());setConfirm(true);setMessage('')}}>{t('Удалить аккаунт','Аккаунтты жою')}</button></p>}
+ </section>;
 }

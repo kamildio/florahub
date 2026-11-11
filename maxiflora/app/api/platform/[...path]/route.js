@@ -9,10 +9,10 @@ import {phoneChannels,phoneChannel,phoneCodeSecret,requirePhoneConsent,channelCo
 import {whatsappFailureMessage} from '../../../../lib/maxiflora/whatsapp-cloud.mjs';
 import {searchCatalog} from '../../../../lib/maxiflora/catalog-search.mjs';
 import {supplierAdminView,supplierAdminAction} from '../../../../lib/maxiflora/supplier-admin.mjs';
-import {submitSupplier} from '../../../../lib/maxiflora/company-profile.mjs';
+import {submitSupplier,submitBuyer} from '../../../../lib/maxiflora/company-profile.mjs';
 import {recordGatewayDelivery,gatewayFailureMessage} from '../../../../lib/maxiflora/telegram-feedback.mjs';
 import {newEmailConfirmation,reserveEmailConfirmation,finishEmailDelivery,confirmProductionEmail} from '../../../../lib/maxiflora/email-confirmation.mjs';
-import {privacyAction} from '../../../../lib/maxiflora/privacy.mjs';
+import {privacyAction,claimDeletionNotice,finishDeletionNotice} from '../../../../lib/maxiflora/privacy.mjs';
 import {CONSENT_VERSION,registrationDetails,createVerifiedAccount,restoreAccountProfile} from '../../../../lib/maxiflora/registration.mjs';
 import {normalizePhone,normalizeEmail,makeChallenge,storeChallenge,markDelivered,markDeliveryFailed,consumeCode} from '../../../../lib/maxiflora/auth-codes.mjs';
 import {telegramConfigured,newTelegramFlow,telegramAuthorization,saveTelegramFlow,consumeTelegramFlow,exchangeTelegramCode,telegramAccount,telegramCookie,TELEGRAM_COOKIE,TELEGRAM_ORIGIN} from '../../../../lib/maxiflora/telegram.mjs';
@@ -57,6 +57,12 @@ async function verifiedEmailAccount(email){
 }
 async function passwordHash(password,salt=random()){const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(salt),iterations:100000,hash:'SHA-256'},key,256);return salt+':'+Array.from(new Uint8Array(bits)).map(x=>x.toString(16).padStart(2,'0')).join('');}
 async function deliverPaymentNotice(ws){if(ws!=='live'||!billingConfigured(env))return;const {result:job}=await mutate(ws,(s,time)=>claimPaymentNotice(s,time));if(!job)return;const ok=await sendPaymentNotice(env,job);await mutate(ws,(s,time)=>finishPaymentNotice(s,job,ok,time));}
+async function deliverDeletionNotice(ws){
+ if(ws!=='live'||env.EMAIL_CONFIGURED!==true||typeof env.SEND_DELETION_NOTICE!=='function')return;
+ const {result:job}=await mutate(ws,(s,time)=>claimDeletionNotice(s,time));if(!job)return;
+ let accepted=false;try{await env.SEND_DELETION_NOTICE(job);accepted=true}catch{}
+ await mutate(ws,(s,time)=>finishDeletionNotice(s,job,accepted,time));
+}
 async function handle(r){try{
  const path=new URL(r.url).pathname.split('/').at(-1);const method=r.method;
  if(method==='POST'){
@@ -68,7 +74,7 @@ async function handle(r){try{
   const supplied=r.headers.get('x-maxiflora-maintenance');
   if(!env.MAINTENANCE_SECRET||!supplied||(await hash(supplied))!==(await hash(env.MAINTENANCE_SECRET)))error('Обработчик недоступен.',403);
   if(typeof b.after!=='undefined'&&(typeof b.after!=='string'||b.after.length>200))error('Неверный указатель обработки.',400);
-  const result=await runTimers(db(),{after:b.after||'',limit:100});await deliverPaymentNotice('live');return json(result);
+  const result=await runTimers(db(),{after:b.after||'',limit:100});await deliverPaymentNotice('live');await deliverDeletionNotice('live');return json(result);
  }
  if(new URL(r.url).pathname==='/api/platform/telegram/callback'&&method==='GET'){
   const headers={'Cache-Control':'no-store','Referrer-Policy':'no-referrer','Set-Cookie':telegramCookie('',0)};
@@ -330,7 +336,8 @@ async function handle(r){try{
     result=testing(r)?await verifyEmailCode(s,u,b.code,time):await confirmProductionEmail(s,u,b.code,env.EMAIL_CODE_SECRET,time);
    }else if(typeof b.action==='string'&&b.action.startsWith('tariff-'))result=subscriptionAction(s,u,b,time);
    else if(b.action==='supplier-submit')result=submitSupplier(u,b.profileVersion,time,s);
-   else if(b.action==='privacy-marketing')result=privacyAction(s,u,b,time);
+   else if(b.action==='company-submit')result=submitBuyer(u,b.profileVersion,time,s);
+   else if(['privacy-marketing','privacy-delete-request'].includes(b.action))result=privacyAction(s,u,b,time);
    else if(typeof b.action==='string'&&b.action.startsWith('conversation-'))result=conversationAction(s,u,b,time);
    else if(typeof b.action==='string'&&b.action.startsWith('board-'))result=boardAction(s,u,b,time);
    else if(b.action==='import-preview')result=await previewReceipt(s,u,b,time);
@@ -343,7 +350,8 @@ async function handle(r){try{
    else if(b.action==='assembly-progress')result=setAssemblyProgress(s,u,b);
    else if(b.action==='assembly-ready')result=await batchReady(s,u,b,apply,time);
    else result=apply(s,u,b,time);
-   s.receipts[key]={fingerprint,result,time:Date.now()};return result;});return json(result);
+   if(b.action==='profile'&&b.submitForReview===true){const p=s.profiles[u.id];result={...result,...(p.supplier?submitSupplier(p,p.profileVersion||0,time,s):submitBuyer(p,p.profileVersion||0,time,s))};}
+   s.receipts[key]={fingerprint,result,time:Date.now()};return result;});if(b.action==='privacy-delete-request')await deliverDeletionNotice(ws);return json(result);
  }
  return json({error:'Раздел API не найден.'},404);
  }catch(e){console.error(e instanceof DomainError?e.message:'Platform request failed '+e?.name);if(local(r)&&!(e instanceof DomainError))console.error({busy:/busy|locked/i.test(String(e?.message)),frames:String(e?.stack||'').split('\n').slice(1,4).join('\n')});return json({error:e instanceof DomainError?e.message:'Не удалось сохранить данные. Повторите попытку.'},e instanceof DomainError?e.status:500);}}

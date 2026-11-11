@@ -15,3 +15,13 @@ export async function sendVerificationEmail(settings,{to,code,purpose},createTra
   return {accepted:true};
  }finally{transport.close()}
 }
+
+export async function sendDeletionNotice(settings,{number},createTransport=nodemailer.createTransport){
+ if(!Number.isSafeInteger(number)||number<1)throw new Error('INVALID_NOTICE');
+ const transport=createTransport(smtpOptions(settings)),to='maxiflora2@gmail.com';
+ try{
+  const result=await transport.sendMail({from:{name:'MaXiFlora',address:settings.SMTP_FROM},to,subject:'MaXiFlora · Запрос на удаление аккаунта № '+number,text:'Зарегистрирован запрос на удаление аккаунта № '+number+'. Откройте обращение в кабинете администратора: https://www.maxiflora.kz/#admin',disableFileAccess:true,disableUrlAccess:true});
+  if(!result.accepted?.some(x=>String(x).toLowerCase()===to)||result.rejected?.length)throw new Error('EMAIL_NOT_ACCEPTED');
+  return {accepted:true};
+ }finally{transport.close()}
+}

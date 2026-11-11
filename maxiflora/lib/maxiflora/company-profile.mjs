@@ -29,3 +29,22 @@ export function submitSupplier(p,version,now=Date.now(),s){
  p.supplierStatus='pending';p.submittedAt=now;p.profileVersion=(p.profileVersion||0)+1;p.supplierReview=null;
  p.profileHistory??=[];p.profileHistory.push({event:'submitted',time:now,version:p.profileVersion});return {submitted:true,version:p.profileVersion};
 }
+
+export function buyerIssues(p,s){
+ const issues=supplierIssues(p,s);
+ return issues.filter(issue=>!issue.includes('склада')&&!issue.includes('ИИК'));
+}
+export function companyApproved(p){
+ return companyTypes.includes(p?.companyType)&&(p.companyApproved===true||(p.supplier===true&&p.approved===true));
+}
+export function submitBuyer(p,version,now=Date.now(),s){
+ if(!p||p.supplier)throw new DomainError('Откройте проверку своего профиля компании.',403);
+ if(version!==(p.profileVersion||0))throw new DomainError('Профиль изменился. Обновите данные.',409);
+ if(!p.verified)throw new DomainError('Сначала подтвердите email.',422);
+ if(p.companyApproved)throw new DomainError('Компания уже одобрена.',409);
+ if(p.companyStatus==='pending')throw new DomainError('Компания уже находится на проверке.',409);
+ const issues=buyerIssues(p,s);if(issues.length)throw new DomainError(issues.join(' '),422);
+ p.companyStatus='pending';p.submittedAt=now;p.profileVersion=(p.profileVersion||0)+1;p.companyReview=null;
+ p.profileHistory??=[];p.profileHistory.push({event:'company-submitted',time:now,version:p.profileVersion});
+ return {submitted:true,version:p.profileVersion};
+}

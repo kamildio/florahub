@@ -5,7 +5,7 @@ import {renewStockPublication} from '../lib/maxiflora/offer-publication.mjs';
 import {launchPolicy} from '../lib/maxiflora/launch-policy.mjs';
 import {campaignView,addAlmatyMonths,enrollNewAccount,subscriptionView,subscriptionAction,ensureTariffHistory,tariffHistoryPage} from '../lib/maxiflora/subscriptions.mjs';
 const time=s=>Date.parse(s+'+05:00'),start=time('2026-10-21T00:00:00'),end=time('2026-11-21T00:00:00');
-const fresh=()=>({id:'new-user',supplier:false,approved:false,complete:true,name:'Test',city:'Шымкент',plan:null});
+const fresh=()=>({id:'new-user',companyType:'IP',supplier:false,approved:false,complete:true,name:'Test',city:'Шымкент',plan:null});
 test('campaign is one month, exact Almaty midnight boundaries and inclusive last registration date',()=>{
  assert.equal(campaignView(start-1).status,'scheduled');assert.equal(campaignView(start).status,'active');assert.equal(campaignView(end-1).status,'active');assert.equal(campaignView(end).status,'ended');
  assert.equal(campaignView(start).lastRegistrationDate,'2026-11-20');assert.equal(campaignView(start).endsAt,end);
