@@ -14,7 +14,7 @@ import {recordGatewayDelivery,gatewayFailureMessage} from '../../../../lib/maxif
 import {newEmailConfirmation,reserveEmailConfirmation,finishEmailDelivery,confirmProductionEmail} from '../../../../lib/maxiflora/email-confirmation.mjs';
 import {privacyAction} from '../../../../lib/maxiflora/privacy.mjs';
 import {CONSENT_VERSION,registrationDetails,createVerifiedAccount,restoreAccountProfile} from '../../../../lib/maxiflora/registration.mjs';
-import {normalizePhone,makeChallenge,storeChallenge,markDelivered,markDeliveryFailed,consumeCode} from '../../../../lib/maxiflora/auth-codes.mjs';
+import {normalizePhone,normalizeEmail,makeChallenge,storeChallenge,markDelivered,markDeliveryFailed,consumeCode} from '../../../../lib/maxiflora/auth-codes.mjs';
 import {telegramConfigured,newTelegramFlow,telegramAuthorization,saveTelegramFlow,consumeTelegramFlow,exchangeTelegramCode,telegramAccount,telegramCookie,TELEGRAM_COOKIE,TELEGRAM_ORIGIN} from '../../../../lib/maxiflora/telegram.mjs';
 import { env } from '#platform-runtime';
 import { apply, snapshot, seed, demoProfiles, DomainError } from '../../../../lib/maxiflora/engine.mjs';
@@ -48,6 +48,13 @@ async function session(r){const token=(r.headers.get('cookie')||'').split(';').m
 const cookie=(r,token,age=604800)=>`${COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${age}${new URL(r.url).protocol==='https:'?'; Secure':''}`;
 async function startSession(r,account,ws){const token=random();await db().prepare('INSERT INTO sessions (token,account,workspace,expires) VALUES (?,?,?,?)').bind(await hash(token),account,ws,Date.now()+604800000).run();return cookie(r,token);}
 const phone=normalizePhone;
+const emailAuthEnabled=()=>env.EMAIL_AUTH_ENABLED==='true';
+const emailAuthReady=()=>(emailAuthEnabled()||env.EMAIL_AUTH_ENABLED==='pilot')&&env.EMAIL_CONFIGURED===true&&typeof env.SEND_VERIFICATION_EMAIL==='function'&&typeof env.EMAIL_CODE_SECRET==='string'&&env.EMAIL_CODE_SECRET.length>=32;
+const emailMatches=(profile,email)=>profile?.verified===true&&profile.verificationMethod==='email'&&profile.email?.trim().toLowerCase()===email&&profile.emailVerification?.email===email;
+async function verifiedEmailAccount(email){
+ const account=await db().prepare('SELECT * FROM accounts WHERE email=?').bind(email).first();
+ return account&&emailMatches(JSON.parse(account.profile),email)?account:null;
+}
 async function passwordHash(password,salt=random()){const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(password),'PBKDF2',false,['deriveBits']);const bits=await crypto.subtle.deriveBits({name:'PBKDF2',salt:new TextEncoder().encode(salt),iterations:100000,hash:'SHA-256'},key,256);return salt+':'+Array.from(new Uint8Array(bits)).map(x=>x.toString(16).padStart(2,'0')).join('');}
 async function deliverPaymentNotice(ws){if(ws!=='live'||!billingConfigured(env))return;const {result:job}=await mutate(ws,(s,time)=>claimPaymentNotice(s,time));if(!job)return;const ok=await sendPaymentNotice(env,job);await mutate(ws,(s,time)=>finishPaymentNotice(s,job,ok,time));}
 async function handle(r){try{
@@ -66,7 +73,7 @@ async function handle(r){try{
  if(new URL(r.url).pathname==='/api/platform/telegram/callback'&&method==='GET'){
   const headers={'Cache-Control':'no-store','Referrer-Policy':'no-referrer','Set-Cookie':telegramCookie('',0)};
   try{
-   if(!telegramConfigured(env)||testing(r)||new URL(r.url).origin!==TELEGRAM_ORIGIN)error('Вход через Telegram ещё не подключён.',503);
+   if(emailAuthEnabled()||!telegramConfigured(env)||testing(r)||new URL(r.url).origin!==TELEGRAM_ORIGIN)error('Вход через Telegram ещё не подключён.',503);
    const params=new URL(r.url).searchParams;
    if(['state','code','error'].some(key=>params.getAll(key).length>1))error('Некорректный ответ Telegram.',400);
    const browser=(r.headers.get('cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith(TELEGRAM_COOKIE+'='))?.slice(TELEGRAM_COOKIE.length+1);
@@ -105,16 +112,30 @@ async function handle(r){try{
   return json({...result,accepted:true});
  }
  if(path==='auth-code-send'&&method==='POST'){
-  const channel=phoneChannel(b.channel);
-  if(testing(r)||!phoneChannels(env).channels[channel])error('Выбранный способ отправки кодов пока не подключён.',503);
+  const emailCode=b.channel==='email';
+  const channel=emailCode?'email':phoneChannel(b.channel);
+  if(emailCode?(!emailAuthReady()||(b.purpose==='register'&&!emailAuthEnabled())):emailAuthEnabled())error('Выбранный способ отправки кодов пока не подключён.',503);
+  if(testing(r)||(!emailCode&&!phoneChannels(env).channels[channel]))error('Выбранный способ отправки кодов пока не подключён.',503);
   if(!['register','login','reset-password'].includes(b.purpose))error('Выберите способ подтверждения.',400);
-  requirePhoneConsent(b);
+  if(!emailCode)requirePhoneConsent(b);
   if(b.purpose==='register'&&(env.REGISTRATION_ENABLED!=='true'||env.LEGAL_APPROVED_VERSION!==CONSENT_VERSION))error('Регистрация откроется после утверждения документов.',503);
   if(!/^[a-f0-9-]{36}$/.test(b.operationId||''))error('Начните отправку заново.',400);
   if(b.purpose==='register'){registrationDetails(b);if(db().accountEmailReady&&!(await db().accountEmailReady()))error('Регистрация временно недоступна. Попробуйте позже.',503);}
   const existingBrowser=(r.headers.get('cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('__Host-maxiflora_code='))?.slice('__Host-maxiflora_code='.length);
   const browser=/^[a-f0-9]{64}$/.test(existingBrowser||'')?existingBrowser:random();
-  const {record,code}=await makeChallenge({phone:b.phone,purpose:b.purpose,browser,secret:phoneCodeSecret(env,channel),channel});
+  const secret=emailCode?env.EMAIL_CODE_SECRET:phoneCodeSecret(env,channel);
+  const {record,code}=await makeChallenge({phone:b.phone,email:b.email,purpose:b.purpose,browser,secret,channel});
+  if(emailCode){
+   const account=b.purpose==='register'?null:await verifiedEmailAccount(record.phone);
+   record.account=account?.id||null;
+   const {result}=await mutate('live',(s,time)=>storeChallenge(s,record,time));
+   if(b.purpose==='register'||account){
+    try{await env.SEND_VERIFICATION_EMAIL({to:record.phone,code,purpose:b.purpose});}
+    catch{await mutate('live',s=>markDeliveryFailed(s,record.id));if(b.purpose==='register')error('Не удалось отправить письмо. Попробуйте позже.',503);}
+    await mutate('live',(s,time)=>markDelivered(s,record.id,time));
+   }
+   return json({...result,channel},200,{'Set-Cookie':`__Host-maxiflora_code=${browser}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=600`});
+  }
   record[channel+'Consent']={presentation:b.purpose==='register'?registrationDetails(b).consentPresentation:'channel-checkbox',version:channelConsentVersion(channel),time:record.createdAt,accepted:true};
   const {result}=await mutate('live',(s,time)=>{
    s.authSendReceipts??={};for(const [key,value] of Object.entries(s.authSendReceipts))if(value.at<time-3600000)delete s.authSendReceipts[key];
@@ -132,30 +153,37 @@ async function handle(r){try{
   return json(result,200,{'Set-Cookie':`__Host-maxiflora_code=${browser}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=600`});
  }
  if(path==='auth-code-verify'&&method==='POST'){
-  const channel=phoneChannel(b.channel);
-  if(testing(r)||!phoneChannels(env).channels[channel])error('Вход по коду пока не подключён.',503);
+  const emailCode=b.channel==='email';
+  const channel=emailCode?'email':phoneChannel(b.channel);
+  if(emailCode?(!emailAuthReady()||(b.purpose==='register'&&!emailAuthEnabled())):emailAuthEnabled())error('Выбранный способ отправки кодов пока не подключён.',503);
+  if(testing(r)||(!emailCode&&!phoneChannels(env).channels[channel]))error('Вход по коду пока не подключён.',503);
   if(!['register','login','reset-password'].includes(b.purpose))error('Неверный способ подтверждения.',400);
-  const normalized=phone(b.phone);
+  const normalized=emailCode?normalizeEmail(b.email):phone(b.phone);
   if(b.purpose==='register'&&(env.REGISTRATION_ENABLED!=='true'||env.LEGAL_APPROVED_VERSION!==CONSENT_VERSION))error('Регистрация пока закрыта.',503);
   if(b.purpose!=='login'&&(typeof b.password!=='string'||b.password.length<8||b.password.length>128))error('Пароль — от 8 до 128 символов.');
   if(b.purpose==='register'){registrationDetails(b);if(db().accountEmailReady&&!(await db().accountEmailReady()))error('Регистрация временно недоступна. Попробуйте позже.',503);}
   const browser=(r.headers.get('cookie')||'').split(';').map(x=>x.trim()).find(x=>x.startsWith('__Host-maxiflora_code='))?.slice('__Host-maxiflora_code='.length);
-  const {result:proof}=await mutate('live',(s,time)=>consumeCode(s,{id:b.id,phone:normalized,purpose:b.purpose,browser,code:b.code,channel,secret:phoneCodeSecret(env,channel)},time));
+  const {result:proof}=await mutate('live',(s,time)=>consumeCode(s,{id:b.id,phone:normalized,purpose:b.purpose,browser,code:b.code,channel,secret:emailCode?env.EMAIL_CODE_SECRET:phoneCodeSecret(env,channel)},time));
   if(!proof.ok)return json(proof,422);
-  let account=await db().prepare('SELECT * FROM accounts WHERE phone=?').bind(normalized).first();
+  let account=emailCode?(b.purpose==='register'?null:await verifiedEmailAccount(normalized)):await db().prepare('SELECT * FROM accounts WHERE phone=?').bind(normalized).first();
   if(b.purpose==='register'){
    account=await createVerifiedAccount(db(),b,proof,passwordHash);
   }else if(!account)error('Аккаунт не найден. Сначала зарегистрируйтесь.',404);
+  if(emailCode&&b.purpose!=='register'&&proof.account!==account.id)error('Код недействителен или истёк. Запросите новый.',422);
+  if(emailCode)await mutate('live',s=>{
+   const u=restoreAccountProfile(s,account);
+   if(!emailMatches(u,normalized))error('Код недействителен или истёк. Запросите новый.',422);
+  });
   if(b.purpose==='reset-password'){
    const replacement=await passwordHash(b.password);
    await db().prepare('DELETE FROM sessions WHERE account=?').bind(account.id).run();
    await db().prepare('UPDATE accounts SET password=? WHERE id=?').bind(replacement,account.id).run();
   }
-  await mutate('live',s=>{restoreAccountProfile(s,account);Object.assign(s.profiles[account.id],{phoneVerified:true,phoneVerificationMethod:phoneMethod(proof.channel),phoneVerifiedAt:proof.verifiedAt})});
+  if(!emailCode)await mutate('live',s=>{restoreAccountProfile(s,account);Object.assign(s.profiles[account.id],{phoneVerified:true,phoneVerificationMethod:phoneMethod(proof.channel),phoneVerifiedAt:proof.verifiedAt})});
   return json({ok:true},200,{'Set-Cookie':await startSession(r,account.id,'live')});
  }
  if(path==='telegram-start'&&method==='POST'){
-  if(testing(r)||new URL(r.url).origin!==TELEGRAM_ORIGIN||!telegramConfigured(env))error('Вход через Telegram ещё не подключён.',503);
+  if(testing(r)||new URL(r.url).origin!==TELEGRAM_ORIGIN||emailAuthEnabled()||!telegramConfigured(env))error('Вход через Telegram ещё не подключён.',503);
   const mode=b.mode||'login';
   if(mode==='link'&&(!auth||Date.now()-(auth.expires-604800000)>600000))error('Для привязки Telegram войдите по паролю заново.',401);
   const flow=await newTelegramFlow({mode,account:mode==='link'?auth.account:null,session:mode==='link'?auth.token:null});
@@ -236,7 +264,7 @@ async function handle(r){try{
   const {s,revision}=await mutate(ws,(s,time)=>{ensureInventory(s,time);ensureBoard(s,time,testing(r));ensureHomeContent(s);ensureDirectory(s);ensurePlatformSettings(s);conversationView(s,null);if(auth)ensureTariffHistory(s.profiles[auth.account])}),u=auth?s.profiles[auth.account]:null;
   const mode=new URL(r.url).searchParams.get('mode');
   const view=snapshot(s,u,mode);if(mode!=='supplier'&&new URL(r.url).searchParams.get('catalog')==='remote')view.products=[];
-  return json({...view,...paymentView(s,u,env),...await billingAdminView(s,u,staffContext,env),...await homeContentView(s,u,staffContext),...await catalogAdminView(s,u,staffContext),...await platformSettingsView(s,u,staffContext),...staffSecurityView(s,u,staffContext),...await operationsView(s,u,staffContext),...supplierBannerView(s,u),...subscriptionView(u,Date.now(),s),...businessView(s,u),...boardView(s,u),...conversationView(s,u),...moderationView(s,u,{testMode:testing(r),workspace:ws,productionAuthorized:hasStaffPermission(s,u,staffContext,'moderation')&&staffSecurityView(s,u,staffContext).staffSecurity?.confirmed===true}),offerImports:mode==='supplier'&&u?.supplier?(s.offerImports||[]).filter(x=>x.supplierId===u.id):[],stockVersions:mode==='supplier'&&u?.supplier?Object.fromEntries(await Promise.all(s.products.filter(p=>p.supplierId===u.id).map(async p=>[p.id,await inventoryVersion(p)]))):{},assemblySheets:mode==='supplier'&&u?.supplier?(s.assemblySheets||[]).filter(x=>x.supplierId===u.id).map(x=>assemblyView(s,u,x.id)):[],inventoryImports:mode==='supplier'?ownImports(s,u):[],calendar:mode==='supplier'?supplierCalendar(s,u):[],mailbox:u&&testing(r)?accountMail(s,u.id):[],revision,testMode:testing(r),authenticated:!!u,emailVerification:{configured:!testing(r)&&env.EMAIL_CONFIGURED===true,pending:!!u&&!testing(r)&&s.productionEmailChallenges?.[u.id]?.status==='sent'&&s.productionEmailChallenges[u.id].expiresAt>Date.now()&&s.productionEmailChallenges[u.id].email===u.email?.trim().toLowerCase()},phoneAuth:{...phoneChannels(testing(r)?{}:env),registration:!testing(r)&&phoneChannels(env).configured&&env.REGISTRATION_ENABLED==='true'&&env.LEGAL_APPROVED_VERSION===CONSENT_VERSION&&(!db().accountEmailReady||await db().accountEmailReady())},telegram:{configured:!testing(r)&&telegramConfigured(env),linked:!!u&&Object.values(s.telegramIdentities||{}).some(x=>x.account===u.id)}});
+  return json({...view,...paymentView(s,u,env),...await billingAdminView(s,u,staffContext,env),...await homeContentView(s,u,staffContext),...await catalogAdminView(s,u,staffContext),...await platformSettingsView(s,u,staffContext),...staffSecurityView(s,u,staffContext),...await operationsView(s,u,staffContext),...supplierBannerView(s,u),...subscriptionView(u,Date.now(),s),...businessView(s,u),...boardView(s,u),...conversationView(s,u),...moderationView(s,u,{testMode:testing(r),workspace:ws,productionAuthorized:hasStaffPermission(s,u,staffContext,'moderation')&&staffSecurityView(s,u,staffContext).staffSecurity?.confirmed===true}),offerImports:mode==='supplier'&&u?.supplier?(s.offerImports||[]).filter(x=>x.supplierId===u.id):[],stockVersions:mode==='supplier'&&u?.supplier?Object.fromEntries(await Promise.all(s.products.filter(p=>p.supplierId===u.id).map(async p=>[p.id,await inventoryVersion(p)]))):{},assemblySheets:mode==='supplier'&&u?.supplier?(s.assemblySheets||[]).filter(x=>x.supplierId===u.id).map(x=>assemblyView(s,u,x.id)):[],inventoryImports:mode==='supplier'?ownImports(s,u):[],calendar:mode==='supplier'?supplierCalendar(s,u):[],mailbox:u&&testing(r)?accountMail(s,u.id):[],revision,testMode:testing(r),authenticated:!!u,emailVerification:{configured:!testing(r)&&env.EMAIL_CONFIGURED===true,pending:!!u&&!testing(r)&&s.productionEmailChallenges?.[u.id]?.status==='sent'&&s.productionEmailChallenges[u.id].expiresAt>Date.now()&&s.productionEmailChallenges[u.id].email===u.email?.trim().toLowerCase()},phoneAuth:{...phoneChannels(testing(r)||emailAuthEnabled()?{}:env),email:!testing(r)&&emailAuthReady(),emailMode:!testing(r)&&emailAuthEnabled(),registration:!testing(r)&&(emailAuthEnabled()?emailAuthReady():phoneChannels(env).configured)&&env.REGISTRATION_ENABLED==='true'&&env.LEGAL_APPROVED_VERSION===CONSENT_VERSION&&(!db().accountEmailReady||await db().accountEmailReady())},telegram:{configured:!testing(r)&&!emailAuthEnabled()&&telegramConfigured(env),linked:!!u&&Object.values(s.telegramIdentities||{}).some(x=>x.account===u.id)}});
  }
  if(path==='tariff-history'&&method==='GET'){
   if(!auth)error('Войдите для просмотра истории тарифов.',401);

@@ -9,6 +9,7 @@ export const env={
  PAYMENTS_TELEGRAM_FETCH:telegramCurl,
  ...Object.fromEntries(['AUTH_CODE_SECRET','WHATSAPP_ENABLED','WHATSAPP_CONSENT_APPROVED_VERSION','WHATSAPP_ACCESS_TOKEN','WHATSAPP_PHONE_NUMBER_ID','WHATSAPP_API_VERSION','WHATSAPP_AUTH_TEMPLATE','WHATSAPP_TEMPLATE_LANGUAGE'].map(key=>[key,process.env[key]])),
  ...Object.fromEntries(['MANUAL_PAYMENTS_ENABLED','PAYMENTS_BOT_TOKEN','PAYMENTS_CHAT_ID'].map(key=>[key,process.env[key]])),
+ EMAIL_AUTH_ENABLED:process.env.EMAIL_AUTH_ENABLED||'pilot',
  EMAIL_CONFIGURED:smtpConfigured(process.env),
  EMAIL_CODE_SECRET:process.env.EMAIL_CODE_SECRET||process.env.TELEGRAM_GATEWAY_TOKEN,
  SEND_VERIFICATION_EMAIL:message=>sendVerificationEmail(process.env,message),

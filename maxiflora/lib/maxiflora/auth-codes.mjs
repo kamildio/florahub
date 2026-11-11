@@ -7,6 +7,12 @@ const hex=bytes=>Array.from(bytes,x=>x.toString(16).padStart(2,'0')).join('');
 const random=()=>hex(crypto.getRandomValues(new Uint8Array(32)));
 const hash=async text=>hex(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text))));
 export function normalizePhone(value){let n=String(value||'').replace(/\D/g,'');if(n.length===11&&n[0]==='8')n='7'+n.slice(1);if(!/^77\d{9}$/.test(n))fail('Введите номер Казахстана: +7 7XX XXX XX XX.');return '+'+n;}
+export function normalizeEmail(value){
+ const email=typeof value==='string'?value.trim().toLowerCase():'';
+ if(email.length>254||!/^[^\s@<>,;:"\\\x00-\x1f\x7f]+@[^\s@<>,;:"\\\x00-\x1f\x7f]+\.[^\s@<>,;:"\\\x00-\x1f\x7f]+$/.test(email))fail('Укажите корректный email.');
+ return email;
+}
+const targetOf=(value,channel)=>channel==='email'?normalizeEmail(value):normalizePhone(value);
 export function newCode(){
  // Rejection sampling avoids modulo bias in six-digit codes.
  let n;do{n=crypto.getRandomValues(new Uint32Array(1))[0]}while(n>=4294000000);
@@ -17,10 +23,10 @@ async function codeDigest(secret,id,code){
  const key=await crypto.subtle.importKey('raw',new TextEncoder().encode(secret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
  return hex(new Uint8Array(await crypto.subtle.sign('HMAC',key,new TextEncoder().encode(id+':'+code))));
 }
-export async function makeChallenge({phone,purpose,browser,secret,channel='telegram'},now=Date.now()){
- if(!['telegram','whatsapp'].includes(channel)||!purposes.has(purpose)||typeof browser!=='string'||!/^[a-f0-9]{64}$/.test(browser))fail('Начните подтверждение заново.',400);
- const id=random(),code=newCode(),target=normalizePhone(phone);
- const record={id,phone:target,purpose,channel,browserHash:await hash(browser),digest:await codeDigest(secret,id,code),createdAt:now,expiresAt:now+300000,resendAt:now+60000,attempts:0,status:'pending'};
+export async function makeChallenge({phone,email,purpose,browser,secret,channel='telegram'},now=Date.now()){
+ if(!['telegram','whatsapp','email'].includes(channel)||!purposes.has(purpose)||typeof browser!=='string'||!/^[a-f0-9]{64}$/.test(browser))fail('Начните подтверждение заново.',400);
+ const id=random(),code=newCode(),target=targetOf(channel==='email'?email:phone,channel);
+ const record={id,phone:target,purpose,channel,browserHash:await hash(browser),digest:await codeDigest(secret,id,code),createdAt:now,expiresAt:now+(channel==='email'?600000:300000),resendAt:now+60000,attempts:0,status:'pending'};
  return {record,code};
 }
 export function storeChallenge(s,record,now=Date.now()){
@@ -41,10 +47,10 @@ export function markDelivered(s,id,now=Date.now()){
 export function markDeliveryFailed(s,id){const q=s.authChallenges?.find(x=>x.id===id);if(q?.status==='pending')q.status='delivery-failed';}
 export async function consumeCode(s,{id,phone,purpose,browser,code,secret,channel='telegram'},now=Date.now()){
  const q=s.authChallenges?.find(x=>x.id===id),invalid={ok:false,error:'Код недействителен или истёк. Запросите новый.'};
- if(!q||(q.channel||'telegram')!==channel||q.status!=='sent'||q.expiresAt<=now||q.purpose!==purpose||q.phone!==normalizePhone(phone)||q.browserHash!==await hash(String(browser||'')))return invalid;
+ if(!q||(q.channel||'telegram')!==channel||q.status!=='sent'||q.expiresAt<=now||q.purpose!==purpose||q.phone!==targetOf(phone,channel)||q.browserHash!==await hash(String(browser||'')))return invalid;
  if(q.attempts>=5)return {ok:false,error:'Лимит попыток исчерпан. Запросите новый код.'};
  q.attempts++;
  if(typeof code!=='string'||!/^\d{6}$/.test(code)||await codeDigest(secret,id,code)!==q.digest)return {ok:false,error:'Неверный код.'};
  q.status='consumed';q.consumedAt=now;
- return {ok:true,phone:q.phone,purpose:q.purpose,channel:q.channel||'telegram',verifiedAt:now};
+ return {ok:true,...(channel==='email'?{email:q.phone,account:q.account,challengeId:q.id}:{phone:q.phone}),purpose:q.purpose,channel:q.channel||'telegram',verifiedAt:now};
 }
