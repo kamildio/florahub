@@ -58,3 +58,23 @@ export async function homeContentAction(s,u,b,ctx,now=Date.now()){
  }
  s.receipts??={};s.receipts[key]={fingerprint:fp,result,time:now};return result;
 }
+
+// Shared cabinet announcements use public material, without changing personal consent records.
+export function syncCabinetNews(s,now=Date.now()){
+ const news=publicHomeContent(s,now).filter(item=>item.type==='news');
+ if(!news.length)return;
+ s.notifications??=[];
+ const users=Object.keys(s.profiles||{});
+ for(const item of news){
+  const id='platform-news:'+item.id;
+  let notification=s.notifications.find(n=>n.id===id);
+  if(!notification){
+   notification={id,users:[],target:'news',newsId:item.id,time:Math.max(item.startsAt||0,now),readBy:[]};
+   s.notifications.unshift(notification);
+  }
+  if(!Array.isArray(notification.readBy))notification.readBy=Object.keys(notification.readBy||{});
+  notification.users=[...new Set([...notification.users,...users])];
+  notification.text=item.ru.title||item.kk.title;
+  notification.texts={ru:item.ru.title||item.kk.title,kk:item.kk.title||item.ru.title};
+ }
+}

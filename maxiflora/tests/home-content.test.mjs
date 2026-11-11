@@ -12,3 +12,26 @@ test('editing a live material hides it until explicit republication; withdrawal 
 test('retries are idempotent, operation IDs are payload-bound and stale forms never overwrite another edit',async()=>{const s=await fixture(),b=body(s),a=await act(s,user,b,ctx,time);assert.deepEqual(await act(s,user,b,ctx,time),a);assert.equal(s.homeContent.items.length,2);await assert.rejects(()=>act(s,user,{...b,ru:{...b.ru,title:'Другой'}},ctx,time),e=>e.status===409);await assert.rejects(()=>act(s,user,{...body(s),revision:1},ctx,time),e=>e.status===409);assert.equal(s.homeContent.items[1].ru.title,b.ru.title);});
 test('only registry assets and internal destinations are accepted; bilingual content must be complete',async()=>{const s=await fixture();for(const extra of [{asset:'https://evil.invalid/a.png'},{destination:'javascript:alert(1)'},{asset:'business-fox',languages:'both'},{languages:'both'},{endsAt:time},{startsAt:'now'},{ru:{...body(s).ru,body:''}},{type:'banner',destination:'news'}])await assert.rejects(()=>act(s,user,body(s,extra),ctx,time),e=>e.status===422);assert.equal(s.homeContent.items.length,1);});
 test('reorder must contain every exact ID once, and public news has no private audit or actor fields',async()=>{const s=await fixture(),a=await act(s,user,body(s),ctx,time);await act(s,user,{action:'publish',id:a.id,revision:a.revision,operationId:randomUUID()},ctx,time);await assert.rejects(()=>act(s,user,{action:'reorder',ids:[a.id],revision:s.homeContent.revision,operationId:randomUUID()},ctx,time),e=>e.status===422);await act(s,user,{action:'reorder',ids:[a.id,'business-fox'],revision:s.homeContent.revision,operationId:randomUUID()},ctx,time);const rows=publicHomeContent(s,time);assert.equal(rows[0].id,a.id);for(const key of ['audit','updatedBy','version','actorId'])assert.equal(rows[0][key],undefined);assert.equal((await view(s,user,ctx,time)).homeContentAdmin.items.length,2);});
+
+test('public cabinet news reaches buyers and suppliers once while retaining read and consent history',async()=>{
+ const {syncCabinetNews}=await import('../lib/maxiflora/home-content.mjs');
+ const s={profiles:{buyer:{marketingConsent:{enabled:false}},supplier:{supplier:true,marketingConsent:{enabled:false}}},homeContent:{items:[{id:'news-a',type:'news',status:'published',startsAt:0,endsAt:null,position:1,ru:{title:'Новости',body:'Текст'},kk:{title:'Жаңалықтар',body:'Мәтін'},destination:'news'}]},notifications:[]};
+ const original=JSON.stringify(s.profiles);
+ syncCabinetNews(s,1000);syncCabinetNews(s,1001);
+ assert.equal(s.notifications.length,1);assert.deepEqual(s.notifications[0].users,['buyer','supplier']);assert.equal(JSON.stringify(s.profiles),original);
+ s.notifications[0].readBy.push('buyer');s.profiles.newBuyer={};syncCabinetNews(s,1003);
+ assert.equal(s.notifications.length,1);assert.ok(s.notifications[0].readBy.includes('buyer'));assert.ok(s.notifications[0].users.includes('newBuyer'));
+ s.homeContent.items.push({...s.homeContent.items[0],id:'draft',status:'draft'});syncCabinetNews(s,1004);assert.equal(s.notifications.length,1);
+});
+
+test('announcement notifications remain compatible with the normal account snapshot and read action',async()=>{
+ const {seed,snapshot,apply}=await import('../lib/maxiflora/engine.mjs');
+ const {syncCabinetNews}=await import('../lib/maxiflora/home-content.mjs');
+ const s=seed(),u=s.profiles['demo-buyer'];
+ s.homeContent={items:[{id:'public-news',type:'news',status:'published',startsAt:0,endsAt:null,position:0,ru:{title:'News'},kk:{title:'News'}}]};
+ syncCabinetNews(s);
+ assert.equal(snapshot(s,u).notifications.find(n=>n.target==='news').read,false);
+ apply(s,u,{action:'notifications-read'},Date.now());
+ syncCabinetNews(s);
+ assert.equal(snapshot(s,u).notifications.find(n=>n.target==='news').read,true);
+});
