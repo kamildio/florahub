@@ -90,3 +90,12 @@
  .home-carousel .home-carousel-controls>button,.home-carousel .home-carousel-controls>button[aria-pressed]{width:34px;height:44px}
  .home-carousel .home-carousel-count{margin-right:0}
 }
+
+/* Keep the fox, copy and action in separate layout cells at every breakpoint. */
+.home-supplier-invite{display:grid;grid-template-columns:minmax(0,1fr) 120px auto;gap:24px;align-items:center;min-height:164px}
+.home-supplier-invite>div{position:relative;max-width:none;min-width:0}
+.home-supplier-invite p{max-width:460px}
+.home-supplier-invite>img.home-supplier-fox{position:static;display:block;width:120px;height:144px;max-width:100%;margin:-12px 0;object-fit:contain;object-position:center;opacity:1;mask-image:none;pointer-events:none}
+.home-supplier-invite>.btn{position:relative;justify-self:end;margin:0;max-width:100%;white-space:normal;justify-content:center;text-align:center}
+@media(max-width:900px){.home-supplier-invite{grid-template-columns:minmax(0,1fr) 128px;gap:16px 24px}.home-supplier-invite>div{grid-column:1;grid-row:1}.home-supplier-invite>img.home-supplier-fox{grid-column:2;grid-row:1 / span 2;width:128px;height:160px;margin:0}.home-supplier-invite>.btn{grid-column:1;grid-row:2;justify-self:start}}
+@media(max-width:480px){.home-supplier-invite{grid-template-columns:minmax(0,1fr) 88px;gap:16px;padding:20px 18px}.home-supplier-invite>img.home-supplier-fox{grid-column:2;grid-row:1;width:88px;height:128px}.home-supplier-invite h2{font-size:20px}.home-supplier-invite p{font-size:13px}.home-supplier-invite>.btn{grid-column:1 / -1;width:100%;min-height:44px;font-size:13px}}

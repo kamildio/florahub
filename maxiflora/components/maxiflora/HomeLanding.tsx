@@ -4,8 +4,8 @@ import BannerCarousel,{type BannerSlide} from './BannerCarousel';
 import {copyText} from '../../lib/maxiflora/site-copy.mjs';
 import {homeSlides} from './home-slides';
 
-type Props={onSupplier?:(id:string)=>void;siteCopy?:Record<string,any>;banners:Record<string,any>[];onNews:(item:Record<string,any>)=>void;campaign?:Record<string,any>;lang:string;signedIn:boolean;onRole:(supplier:boolean)=>void;onTariffs:()=>void;onCatalog:()=>void;onBoard:()=>void};
-export default function HomeLanding({siteCopy,banners,onNews,campaign,lang,signedIn,onRole,onTariffs,onCatalog,onBoard,onSupplier}:Props){
+type Props={supplier?:boolean;supplierApproved?:boolean;onSupplier?:(id:string)=>void;siteCopy?:Record<string,any>;banners:Record<string,any>[];onNews:(item:Record<string,any>)=>void;campaign?:Record<string,any>;lang:string;signedIn:boolean;onRole:(supplier:boolean)=>void;onTariffs:()=>void;onCatalog:()=>void;onBoard:()=>void};
+export default function HomeLanding({siteCopy,banners,onNews,campaign,lang,signedIn,supplier=false,supplierApproved=false,onRole,onTariffs,onCatalog,onBoard,onSupplier}:Props){
  const t=(ru:string,kk:string)=>lang==='ru'?ru:kk;
  const copy=(id:string)=>copyText(siteCopy,id,lang);
  const slides:BannerSlide[]=[
@@ -29,6 +29,6 @@ export default function HomeLanding({siteCopy,banners,onNews,campaign,lang,signe
     [Tag,copy('wholesaleBenefitTitle'),copy('wholesaleBenefitText')]
    ].map(([Icon,title,text]:any,i)=><article className="home-benefit" key={i}><span className="home-benefit-icon"><Icon size={29}/></span><div><h3>{title}</h3><p>{text}</p></div></article>)}</div>
   </section>
-  <section className="home-supplier-invite" aria-labelledby="home-supplier-title"><div><h2 id="home-supplier-title">{copy('supplierTitle')}</h2><p>{copy('supplierText')}</p></div><img className="home-supplier-fox" src="/images/maxiflora-fox-launch.png" alt="" width="1600" height="640"/><button className="btn" onClick={()=>onRole(true)} title={t(signedIn?'Открыть кабинет поставщика или подготовить профиль для продаж':'Открыть регистрацию поставщика',signedIn?'Жеткізуші кабинетін ашу немесе сату профилін дайындау':'Жеткізуші ретінде тіркелуді ашу')}>{copy('supplierButton')}<ArrowRight size={18}/></button></section>
+  <section className="home-supplier-invite" aria-labelledby="home-supplier-title"><div><h2 id="home-supplier-title">{copy('supplierTitle')}</h2><p>{copy('supplierText')}</p></div><img className="home-supplier-fox" src="/images/maxiflora-fox-bouquet-v2.webp" alt="" width="1000" height="1100"/><button className="btn" onClick={()=>onRole(true)} title={t(signedIn?'Открыть кабинет поставщика или подготовить профиль для продаж':'Открыть регистрацию поставщика',signedIn?'Жеткізуші кабинетін ашу немесе сату профилін дайындау':'Жеткізуші ретінде тіркелуді ашу')}>{supplier?(supplierApproved?t('Кабинет поставщика','Жеткізуші кабинеті'):t('Заполнить профиль поставщика','Жеткізуші профилін толтыру')):copy('supplierButton')}<ArrowRight size={18}/></button></section>
  </div>;
 }
