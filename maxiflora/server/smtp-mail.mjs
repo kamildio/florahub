@@ -25,3 +25,9 @@ export async function sendDeletionNotice(settings,{number},createTransport=nodem
   return {accepted:true};
  }finally{transport.close()}
 }
+
+export async function sendOrderNotice(settings,{id,to,orderId,title},createTransport=nodemailer.createTransport){
+ if(typeof id!=='string'||!/^[a-f0-9-]{36}$/.test(id)||typeof to!=='string'||to.length>254||!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(to)||!Number.isSafeInteger(orderId)||orderId<1||!['Поступил новый заказ','Предзаказ принят поставщиком','Заказ готов к выдаче','Заказ отменён','Заказ не подтверждён в срок','Истёк срок получения заказа','Покупатель запросил отмену заказа','Нужно ответить на изменение заказа'].includes(title))throw new Error('ORDER_NOTICE_INVALID');
+ const transport=createTransport({...smtpOptions(settings),connectionTimeout:3000,greetingTimeout:3000,socketTimeout:5000});let timer;
+ try{const result=await Promise.race([transport.sendMail({from:{name:'MaXiFlora',address:settings.SMTP_FROM},to:{address:to,name:''},messageId:'<order-'+id+'@maxiflora.kz>',subject:'MaXiFlora · '+title+' № '+orderId,text:title+' № '+orderId+'.\n\nАктуальные условия и действия доступны в кабинете: https://www.maxiflora.kz/#orders\nОткройте заказ № '+orderId+'. Время в кабинете указано по Астане.\n\nЭто служебное сообщение по вашему заказу. Пароли, коды входа и банковские реквизиты в ответ не отправляйте.',disableFileAccess:true,disableUrlAccess:true}),new Promise((_,reject)=>{timer=setTimeout(()=>{transport.close();reject(new Error('ORDER_NOTICE_TIMEOUT'))},8000)})]);if(!result.accepted?.some(x=>String(x).toLowerCase()===to.toLowerCase())||result.rejected?.length)throw new Error('EMAIL_NOT_ACCEPTED');return {accepted:true}}finally{clearTimeout(timer);transport.close()}
+}

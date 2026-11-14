@@ -1,7 +1,7 @@
 import {recordRequest,requestMetrics} from './request-metrics.mjs';
 import {telegramCurl} from './telegram-transport.mjs';
 import {nodeDatabase} from './mysql-store.mjs';
-import {smtpConfigured,sendVerificationEmail,sendDeletionNotice} from './smtp-mail.mjs';
+import {smtpConfigured,sendVerificationEmail,sendDeletionNotice,sendOrderNotice} from './smtp-mail.mjs';
 
 // No demo or in-memory fallback on the production hosting.
 export const env={
@@ -12,6 +12,7 @@ export const env={
  EMAIL_AUTH_ENABLED:process.env.EMAIL_AUTH_ENABLED||'pilot',
  EMAIL_CONFIGURED:smtpConfigured(process.env),
  EMAIL_CODE_SECRET:process.env.EMAIL_CODE_SECRET||process.env.TELEGRAM_GATEWAY_TOKEN,
+ SEND_ORDER_NOTICE:message=>sendOrderNotice(process.env,message),
  SEND_DELETION_NOTICE:message=>sendDeletionNotice(process.env,message),
  SEND_VERIFICATION_EMAIL:message=>sendVerificationEmail(process.env,message),
  TELEGRAM_GATEWAY_TOKEN:process.env.TELEGRAM_GATEWAY_TOKEN,

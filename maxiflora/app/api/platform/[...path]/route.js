@@ -1,3 +1,5 @@
+import {reorderPreview} from '../../../../lib/maxiflora/reorder.mjs';
+import {claimOrderMail,finishOrderMail,orderMailView} from '../../../../lib/maxiflora/order-mail.mjs';
 import {accountReadiness} from '../../../../lib/maxiflora/account-readiness.mjs';
 import {adminOrdersView} from '../../../../lib/maxiflora/admin-orders.mjs';
 import {adminQueueView,syncAdminQueueNotifications} from '../../../../lib/maxiflora/admin-queues.mjs';
@@ -66,6 +68,11 @@ async function deliverDeletionNotice(ws){
  let accepted=false;try{await env.SEND_DELETION_NOTICE(job);accepted=true}catch{}
  await mutate(ws,(s,time)=>finishDeletionNotice(s,job,accepted,time));
 }
+async function deliverOrderNotices(){
+ if(env.EMAIL_CONFIGURED!==true||typeof env.SEND_ORDER_NOTICE!=='function')return;
+ const claims=[];for(let i=0;i<4;i++){const {result:job}=await mutate('live',(s,time)=>claimOrderMail(s,time,claims.map(j=>j.accountId+':'+j.orderId)));if(!job)break;claims.push(job)}
+ await Promise.all(claims.map(async job=>{let accepted=false;try{await env.SEND_ORDER_NOTICE(job);accepted=true}catch{}await mutate('live',(s,time)=>finishOrderMail(s,job,accepted,time))}));
+}
 async function handle(r){try{
  const path=new URL(r.url).pathname.split('/').at(-1);const method=r.method;
  if(method==='POST'){
@@ -77,7 +84,7 @@ async function handle(r){try{
   const supplied=r.headers.get('x-maxiflora-maintenance');
   if(!env.MAINTENANCE_SECRET||!supplied||(await hash(supplied))!==(await hash(env.MAINTENANCE_SECRET)))error('Обработчик недоступен.',403);
   if(typeof b.after!=='undefined'&&(typeof b.after!=='string'||b.after.length>200))error('Неверный указатель обработки.',400);
-  const result=await runTimers(db(),{after:b.after||'',limit:100});await deliverPaymentNotice('live');await deliverDeletionNotice('live');return json(result);
+  const result=await runTimers(db(),{after:b.after||'',limit:100});await Promise.all([deliverPaymentNotice('live'),deliverDeletionNotice('live'),deliverOrderNotices()]);return json(result);
  }
  if(new URL(r.url).pathname==='/api/platform/telegram/callback'&&method==='GET'){
   const headers={'Cache-Control':'no-store','Referrer-Policy':'no-referrer','Set-Cookie':telegramCookie('',0)};
@@ -199,6 +206,7 @@ async function handle(r){try{
   await mutate('live',s=>saveTelegramFlow(s,flow));
   return json({url:await telegramAuthorization(flow,env.TELEGRAM_CLIENT_ID)},200,{'Set-Cookie':telegramCookie(flow.browser)});
  }
+ if(path==='reorder'&&method==='GET'){if(!auth)error('Войдите в аккаунт.',401);const id=Number(new URL(r.url).searchParams.get('id'));if(!Number.isSafeInteger(id)||id<1)error('Проверьте номер заказа.',400);const s=JSON.parse((await load(ws)).state);return json(reorderPreview(s,s.profiles[auth.account],id));}
  if(path==='admin-orders'&&method==='GET'){if(!auth)error('Войдите в аккаунт.',401);const s=JSON.parse((await load(ws)).state),params=new URL(r.url).searchParams;return json(adminOrdersView(s,s.profiles[auth.account],staffContext,{query:params.get('query')||'',status:params.get('status')||'all',...(params.has('before')?{before:Number(params.get('before'))}:{}),...(params.has('id')?{id:Number(params.get('id'))}:{})}));}
  if(path==='supplier-admin'&&['GET','POST'].includes(method)){
   if(!auth)error('Войдите в аккаунт.',401);
@@ -230,7 +238,7 @@ async function handle(r){try{
   const {result}=await mutate(ws,(s,time)=>operationsAction(s,s.profiles[auth.account],b,staffContext,time));return json(result);
  }
  if(path==='monitoring'&&method==='GET'){
-  if(!auth)error('Войдите в аккаунт.',401);const s=JSON.parse((await load(ws)).state);await requireHomeEditor(s,s.profiles[auth.account],staffContext,false,Date.now(),'monitoring');return json({monitoring:typeof env.REQUEST_METRICS==='function'?env.REQUEST_METRICS():null,whatsappReadiness:whatsappReadiness(env)});
+  if(!auth)error('Войдите в аккаунт.',401);const s=JSON.parse((await load(ws)).state);await requireHomeEditor(s,s.profiles[auth.account],staffContext,false,Date.now(),'monitoring');return json({orderEmails:{...orderMailView(s),configured:env.EMAIL_CONFIGURED===true&&typeof env.SEND_ORDER_NOTICE==='function'},monitoring:typeof env.REQUEST_METRICS==='function'?env.REQUEST_METRICS():null,whatsappReadiness:whatsappReadiness(env)});
  }
  if(path==='payments'&&method==='GET'){if(!auth)error('Войдите в аккаунт.',401);const {s}=await mutate(ws,()=>null);return json(paymentView(s,s.profiles[auth.account],env));}
  if(['payments','billing-admin'].includes(path)&&method==='POST'){
@@ -324,7 +332,7 @@ async function handle(r){try{
   if(b.action==='profile'&&b.email&&db().accountEmailReady&&!(await db().accountEmailReady()))error('Изменение email временно недоступно. Обратитесь в поддержку.',503);
   if(typeof b.operationId!=='string'||!/^[-a-zA-Z0-9]{16,80}$/.test(b.operationId))error('Не указан идентификатор операции.',400);
   const fingerprint=await hash(JSON.stringify({...b,operationId:undefined}));
-  const {result}=await mutate(ws,async (s,time)=>{ensureInventory(s,time);ensureBoard(s,time,testing(r));const u=s.profiles[auth.account];if(!u)error('Сеанс недействителен.',401);const key=u.id+':'+b.operationId;
+  const {result}=await mutate(ws,async (s,time)=>{ensureInventory(s,time);ensureBoard(s,time,testing(r));const u=s.profiles[auth.account];if(!u)error('Сеанс недействителен.',401);if(b.expectedAccountId!==undefined&&b.expectedAccountId!==u.id)error('Аккаунт изменился. Обновите страницу перед действием.',409);const key=u.id+':'+b.operationId;
    const moderationContext={...staffContext};
    if(typeof b.action==='string'&&b.action.startsWith('moderation-')){if(testing(r)&&u.id===TEST_MODERATOR)requireTestModerator(u,moderationContext);else {await requireHomeEditor(s,u,staffContext,true,time,'moderation');moderationContext.productionAuthorized=true;}}
    if(u.id===TEST_MODERATOR&&(typeof b.action!=='string'||!b.action.startsWith('moderation-')))error('Тестовый модератор работает только с очередью контента.',403);

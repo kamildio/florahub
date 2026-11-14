@@ -6,7 +6,7 @@ export async function maintenancePass(secret,send=fetch,deadline=Date.now()+9000
  let after='',checked=0,changed=0;
  for(let page=0;page<1000;page++){
   if(Date.now()>=deadline)throw new Error('MAINTENANCE_TIME_LIMIT');
-  const response=await send(endpoint,{method:'POST',redirect:'error',signal:AbortSignal.timeout(15000),headers:{'Content-Type':'application/json','x-maxiflora-maintenance':secret},body:JSON.stringify({after})});
+  const response=await send(endpoint,{method:'POST',redirect:'error',signal:AbortSignal.timeout(30000),headers:{'Content-Type':'application/json','x-maxiflora-maintenance':secret},body:JSON.stringify({after})});
   if(!response.ok)throw new Error('MAINTENANCE_HTTP_'+response.status);
   const text=await response.text();if(text.length>65536)throw new Error('MAINTENANCE_RESPONSE_INVALID');
   const data=JSON.parse(text);
