@@ -40,8 +40,8 @@ const op=body=>({...body,operationId:crypto.randomUUID()});
 const staff=['content','support','moderator','billing'];
 const expected={
  guest:[],buyer:[],supplier:[],
- owner:['owner','content','catalog','support','moderation','suppliers','ads','billing','settings','staff','monitoring'],
- content:['content','catalog'],support:['support'],moderator:['moderation','ads'],billing:['billing']
+ owner:['owner','orders','content','catalog','support','moderation','suppliers','ads','billing','settings','staff','monitoring'],
+ content:['content','catalog'],support:['support','suppliers','orders'],moderator:['moderation','ads','content','catalog'],billing:['billing']
 };
 const surfaces={homeContentAdmin:'content',catalogAdmin:'catalog',billingAdmin:'billing',platformSettingsAdmin:'settings'};
 const writes={
@@ -62,7 +62,7 @@ for(const [role,permissions] of Object.entries(expected)){
  for(const [key,permission] of Object.entries(surfaces))assert.equal(!!view[key],permissions.includes(permission),role+' '+key);
  for(const [key,permission] of Object.entries({cases:'support',banners:'ads',members:'staff'}))assert.equal(!!view.operationsAdmin?.[key],permissions.includes(permission),role+' '+key);
  await check(role,'monitoring',null,role==='owner'?200:role==='guest'?401:403);
- await check(role,'admin-orders',null,role==='owner'?200:role==='guest'?401:403);
+ await check(role,'admin-orders',null,permissions.includes('orders')?200:role==='guest'?401:403);
  if(!permissions.length)assert.equal(view.adminQueues,null);else assert.ok(view.adminQueues);
  for(const [path,[permission,action]] of Object.entries(writes)){
   if(!permissions.includes(permission))await check(role,path,op({action}),role==='guest'?401:403);

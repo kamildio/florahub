@@ -3,12 +3,13 @@ import {DomainError} from './engine.mjs';
 import {supplierIssues,buyerIssues} from './company-profile.mjs';
 import {requireStaffConfirmation} from './staff-security.mjs';
 export function supplierAdminView(s,actor,ctx,now=Date.now()){
- requireStaffConfirmation(s,actor,ctx,{now});
+ requireStaffConfirmation(s,actor,ctx,{now,permission:'suppliers'});
  return {suppliers:Object.values(s.profiles).filter(p=>p.supplier).map(p=>({id:p.id,companyType:p.companyType,name:p.name,contact:p.contact,city:p.city,email:p.email,phone:p.phone,bin:p.bin,legalAddress:p.legalAddress,address:p.address,bank:p.bank,pendingBank:p.pendingBank||null,approved:p.approved,supplierStatus:p.supplierStatus||(p.approved?'approved':'draft'),profileVersion:p.profileVersion||0,submittedAt:p.submittedAt||null,review:p.supplierReview||null,issues:supplierIssues(p,s)})),buyers:Object.values(s.profiles).filter(p=>!p.supplier).map(p=>({id:p.id,companyType:p.companyType,name:p.name,contact:p.contact,city:p.city,email:p.email,phone:p.phone,bin:p.bin,legalAddress:p.legalAddress,approved:p.companyApproved===true,supplierStatus:p.companyStatus||(p.companyApproved?'approved':'draft'),profileVersion:p.profileVersion||0,submittedAt:p.submittedAt||null,review:p.companyReview||null,issues:buyerIssues(p,s),buyer:true})),audit:(s.supplierAdminAudit||[]).slice(-100).reverse()};
 }
 export function supplierAdminAction(s,actor,b,ctx,now=Date.now()){
- requireStaffConfirmation(s,actor,ctx,{critical:true,now});
+ requireStaffConfirmation(s,actor,ctx,{critical:true,now,permission:'suppliers'});
  if(!['approve','reject','bank-approve','bank-reject'].includes(b.action))throw new DomainError('Действие недоступно.',403);
+ if(actor.id===b.id&&actor.id!==ctx.ownerId)throw new DomainError('Нельзя проверять собственную компанию.',403);
  const p=s.profiles[b.id];if(!p)throw new DomainError('Компания не найдена.',404);
  if(!p.supplier)return reviewBuyer(s,actor,p,b,now);
  if(!Number.isSafeInteger(b.profileVersion)||b.profileVersion!==(p.profileVersion||0))throw new DomainError('Профиль изменился. Откройте актуальную версию.',409);

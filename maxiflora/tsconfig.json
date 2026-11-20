@@ -44,6 +44,10 @@
   ],
   "exclude": [
     "node_modules",
-    "examples"
+    "examples",
+    ".next-node/standalone",
+    ".next-node/cache",
+    "dist",
+    ".wrangler"
   ]
 }
