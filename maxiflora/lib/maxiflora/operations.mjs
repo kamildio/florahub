@@ -13,7 +13,7 @@ export function supplierBannerView(s,u,now=Date.now()){const period=bannerPeriod
 export async function operationsView(s,u,ctx,now=Date.now()){
  const permissions=staffPermissions(s,u,ctx),out={operationsAdmin:null};if(!permissions.length)return out;
  try{await requireHomeEditor(s,u,ctx,false,now,permissions[0])}catch(e){if(e instanceof DomainError)return out;throw e}
- const allowed=p=>permissions.includes(p);out.operationsAdmin={permissions,roles:staffRoles,
+ const allowed=p=>permissions.includes(p);out.operationsAdmin={permissions,actorId:u.id,roles:staffRoles,
  ...(allowed('ads')?{banners:actionableWindow(s.supplierBanners||[],x=>['pending','approved'].includes(displayed(x,now).status)).reverse().map(x=>({...displayed(x,now),accountName:s.profiles[x.accountId]?.name}))}:{}),
  ...(allowed('support')?{cases:actionableWindow([...(s.supportCases||[])].reverse(),c=>!['resolved','closed'].includes(c.status)).sort((a,b)=>(b.updated||b.created)-(a.updated||a.created)).map(c=>({...c,assignedName:s.profiles[c.assignedTo]?.name||null,version:c.version||1,participants:c.participants.map(id=>({id,name:s.profiles[id]?.name||'Клиент'})),order:c.orderId?(()=>{const o=s.orders.find(o=>o.id===c.orderId);return o?{id:o.id,status:o.status,buyer:o.buyer,supplier:o.supplier,items:o.items.map(x=>({name:x.name,qty:x.qty})),history:o.history,discipline:o.discipline}:null})():null}))}:{}),
  ...(allowed('staff')?{members:Object.entries(s.staffMembers||{}).map(([id,x])=>({id,...x,name:s.profiles[id]?.name,email:s.profiles[id]?.email})),accounts:Object.values(s.profiles||{}).filter(p=>p.id!==ctx.ownerId&&p.verified&&p.verificationMethod==='email').map(p=>({id:p.id,name:p.name,email:p.email})),audit:(s.operationsAudit||[]).slice(-100).reverse()}:{}),
@@ -62,6 +62,14 @@ export async function operationsAction(s,u,b,ctx,now=Date.now()){
   if(c.assignedTo&&c.assignedTo!==u.id)fail('Обращение уже взято другим сотрудником.',409);
   c.assignedTo=u.id;c.version=(c.version||1)+1;c.updated=now;if(c.status==='new')c.status='working';
   c.history.push({time:now,text:'Сотрудник взял обращение в работу',by:u.id});audit(s,u,'case-claimed',c.id,'Взято в работу',now);result={id:c.id};
+ }else if(b.action==='case-release'){
+  const c=(s.supportCases||[]).find(c=>c.id===b.id);if(!c)fail('Обращение не найдено.',404);
+  if(c.participants.includes(u.id))fail('Своё обращение должен рассмотреть другой сотрудник.',403);
+  if((c.version||1)!==b.version)fail('Обращение изменилось. Обновите очередь.',409);
+  if(!c.assignedTo||['resolved','closed'].includes(c.status))fail('Нет действующего назначения.',409);
+  if(c.assignedTo!==u.id&&u.id!==ctx.ownerId)fail('Снять чужое назначение может только владелец.',403);
+  const reason=text(b.text,1000),previous=c.assignedTo;delete c.assignedTo;c.version=(c.version||1)+1;c.updated=now;
+  c.history.push({time:now,text:'Обращение возвращено в очередь: '+reason,by:u.id,previousAssignee:previous});audit(s,u,'case-released',c.id,reason,now);result={id:c.id};
  }else if(b.action==='case-update'){
   const c=(s.supportCases||[]).find(c=>c.id===b.id);if(!c)fail('Обращение не найдено.',404);if(c.participants.includes(u.id))fail('Своё обращение должен рассмотреть другой сотрудник.',403);if((c.version||1)!==b.version)fail('Обращение изменилось. Обновите очередь.',409);
   if(c.assignedTo&&c.assignedTo!==u.id)fail('Обращение находится в работе у другого сотрудника.',409);
