@@ -255,3 +255,23 @@
 .account-guide-progress>span{flex:0 0 auto;white-space:nowrap}.account-guide-progress progress{flex:1;min-width:0;width:auto;appearance:none;background:#f0f1f4}.account-guide-progress progress::-webkit-progress-bar{background:#f0f1f4;border-radius:8px}.account-guide-progress progress::-webkit-progress-value{background:#ee4055;border-radius:8px}.account-guide-progress progress::-moz-progress-bar{background:#ee4055;border-radius:8px}
 
 .repeat-order-entry{margin:0 0 18px 16px}.repeat-order .card{padding:16px;margin:14px 0}.repeat-order .note{font-size:13px}.repeat-order .btnrow{flex-wrap:wrap}@media(max-width:480px){.repeat-order-entry{margin:0 0 18px;width:100%}.repeat-order .btnrow>.btn{width:100%}}
+
+/* Keep support actions readable and separated on narrow screens. */
+.operations-workspace>.card{margin-block:16px;padding:24px;overflow-wrap:anywhere}
+.operations-workspace>.card>.btn{margin:8px 10px 0 0}
+.operations-workspace>.card h3{line-height:1.4;margin-bottom:10px}
+.operations-workspace>.card p{line-height:1.65}
+.operations-form{display:grid;gap:18px;min-width:0}
+.operations-form .field{min-width:0;margin:0}
+.operations-form textarea{min-height:120px;resize:vertical}
+.operation-message{padding:16px 18px;margin-block:12px;border:1px solid var(--line);border-radius:12px;background:#fafbfc;overflow-wrap:anywhere}
+.operation-message small{display:block;color:var(--muted);line-height:1.6}
+.operation-message p{white-space:pre-wrap;line-height:1.65;margin:8px 0 0}
+.customer-support>.card{margin-block:16px;overflow-wrap:anywhere}
+.operations-workspace .btnrow,.customer-support .btnrow{flex-wrap:wrap;gap:10px}
+@media(max-width:650px){
+ .operations-workspace>.card{padding:18px}
+ .operations-workspace>.card>.btn{display:flex;justify-content:center;width:100%;margin:10px 0 0;white-space:normal}
+ .operations-form .btnrow>.btn,.customer-support .btnrow>.btn{flex:1 1 100%;white-space:normal}
+ .operation-message{padding:14px}
+}
