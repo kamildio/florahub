@@ -89,7 +89,8 @@ export function apply(s,u,body,now=Date.now()){
   u.supplier=true;u.approved=false;u.supplierStatus='draft';u.profileVersion=(u.profileVersion||0)+1;u.plan=u.launchTrial?.plan||null;u.supplierEnabledAt=now;return {ok:true};
  }
  if(kind==='notifications-read'){
-  for(const n of s.notifications.filter(n=>n.users.includes(u.id))){n.readBy??=[];if(!n.readBy.includes(u.id))n.readBy.push(u.id);}return {ok:true};
+  if(body.ids!==undefined&&(!Array.isArray(body.ids)||body.ids.length>500||body.ids.some(id=>typeof id!=='string')))fail('Проверьте список уведомлений.');
+  for(const n of s.notifications.filter(n=>n.users.includes(u.id)&&(body.ids===undefined||body.ids.includes(n.id)))){n.readBy??=[];if(!n.readBy.includes(u.id))n.readBy.push(u.id);}return {ok:true};
  }
  if(kind==='checkout'){
   if(!companyApproved(u))fail('Отправьте профиль ИП или ТОО на проверку. Оформление заказов откроется после одобрения компании.',403);
