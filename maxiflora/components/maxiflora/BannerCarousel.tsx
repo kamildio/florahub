@@ -6,13 +6,13 @@ export type BannerSlide={id:string;desktop:string;mobile:string;alt:string;onOpe
 
 /** The list is deliberately uncapped; navigation uses its current length. */
 export default function BannerCarousel({slides,lang}:{slides:BannerSlide[];lang:string}){
- const [index,setIndex]=useState(0),[paused,setPaused]=useState(false),[hover,setHover]=useState(false),[focused,setFocused]=useState(false),[hidden,setHidden]=useState(false);
+ const [index,setIndex]=useState(0),[paused,setPaused]=useState(true),[hover,setHover]=useState(false),[focused,setFocused]=useState(false),[hidden,setHidden]=useState(false);
  const touch=useRef<{x:number;y:number}|null>(null),swiped=useRef(false);
  const t=(ru:string,kk:string)=>lang==='ru'?ru:kk;
  const count=slides.length,current=count?index%count:0;
  useEffect(()=>{
   const preference=window.matchMedia('(prefers-reduced-motion: reduce)');
-  const reduce=()=>setPaused(preference.matches);
+  const reduce=()=>setPaused(true);
   const visibility=()=>setHidden(document.hidden);
   reduce();visibility();preference.addEventListener('change',reduce);document.addEventListener('visibilitychange',visibility);
   return()=>{preference.removeEventListener('change',reduce);document.removeEventListener('visibilitychange',visibility)};
