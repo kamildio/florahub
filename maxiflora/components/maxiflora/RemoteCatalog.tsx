@@ -1,4 +1,5 @@
 'use client';
+import ExampleShowcase from './ExampleShowcase';
 import {useEffect,useState} from 'react';
 import CatalogGroups from './CatalogGroups';
 type Row=Record<string,any>;
@@ -17,6 +18,6 @@ export default function RemoteCatalog({filters,revision,renderOffer,lang}:{filte
  },[filterKey,page,limit,revision,retry]);
  if(error)return <div role="alert"><p>{error}</p><button className="btn secondary" onClick={()=>{setError('');setRetry(n=>n+1)}}>{t('Повторить','Қайталау')}</button></div>;
  if(!result||result.key!==key)return <p role="status">{t('Загружаем предложения…','Ұсыныстар жүктелуде…')}</p>;
- if(!result.total)return <div className="empty"><h2>{t('Здесь пока нет предложений','Әзірге ұсыныстар жоқ')}</h2><p>{t('Измените фильтры или выберите другой город.','Сүзгілерді өзгертіңіз немесе басқа қала таңдаңыз.')}</p></div>;
+ if(!result.total)return <><div className="empty"><h2>{t('Здесь пока нет предложений','Әзірге ұсыныстар жоқ')}</h2><p>{t('По выбранным условиям опубликованных предложений нет. Попробуйте убрать фильтры или выбрать другой город. Предложения появляются после публикации поставщиками.','Таңдалған шарттар бойынша жарияланған ұсыныстар жоқ. Сүзгілерді алып тастаңыз немесе басқа қала таңдаңыз. Ұсыныстар жеткізушілер жариялағаннан кейін пайда болады.')}</p></div> <ExampleShowcase lang={lang}/></>;
  return <CatalogGroups key={key} products={[]} remote={result} onPage={setPage} onLimit={n=>{setLimit(n);setPage(1)}} renderOffer={renderOffer} lang={lang}/>;
 }
