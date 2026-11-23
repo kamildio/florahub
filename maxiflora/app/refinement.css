@@ -275,3 +275,10 @@
  .operations-form .btnrow>.btn,.customer-support .btnrow>.btn{flex:1 1 100%;white-space:normal}
  .operation-message{padding:14px}
 }
+
+/* All sections share the same page frame; guests see public browsing only. */
+.platform-shell:not(.is-home) .layout{max-width:1440px;margin-inline:auto;width:100%;box-sizing:border-box}
+.platform-shell:not(.is-home) .main{min-width:0;flex:1;box-sizing:border-box}
+.platform-shell.is-guest:not(.is-home) .layout{display:block}
+.platform-shell.is-guest:not(.is-home) .main{width:100%;max-width:1280px;margin-inline:auto;padding:32px 24px}
+@media(max-width:650px){.platform-shell.is-guest:not(.is-home) .main{padding:24px 16px}}
