@@ -1,3 +1,4 @@
+import {boundedJSONText} from '../../../../lib/maxiflora/request-body.mjs';
 import {reorderPreview} from '../../../../lib/maxiflora/reorder.mjs';
 import {claimOrderMail,finishOrderMail,orderMailView} from '../../../../lib/maxiflora/order-mail.mjs';
 import {accountReadiness} from '../../../../lib/maxiflora/account-readiness.mjs';
@@ -79,7 +80,7 @@ async function handle(r){try{
   const origin=r.headers.get('origin');if(path!=='maintenance'&&(!origin||origin!==new URL(r.url).origin))error('Запрос должен быть отправлен с сайта MaXiFlora.',403);
   if(path!=='media-upload'&&!r.headers.get('content-type')?.includes('application/json'))error('Неверный формат запроса.',415);
  }
- let b={};if(method==='POST'&&path!=='media-upload'){const raw=await r.text();if(raw.length>65536)error('Запрос слишком большой.',413);try{b=JSON.parse(raw)}catch{error('Неверный формат запроса.',400)}if(!b||Array.isArray(b)||typeof b!=='object')error('Неверный формат запроса.',400);}
+ let b={};if(method==='POST'&&path!=='media-upload'){const raw=await boundedJSONText(r);if(raw.length>65536)error('Запрос слишком большой.',413);try{b=JSON.parse(raw)}catch{error('Неверный формат запроса.',400)}if(!b||Array.isArray(b)||typeof b!=='object')error('Неверный формат запроса.',400);}
  if(path==='maintenance'&&method==='POST'){
   const supplied=r.headers.get('x-maxiflora-maintenance');
   if(!env.MAINTENANCE_SECRET||!supplied||(await hash(supplied))!==(await hash(env.MAINTENANCE_SECRET)))error('Обработчик недоступен.',403);
